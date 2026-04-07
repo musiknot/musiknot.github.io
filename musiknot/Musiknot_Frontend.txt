@@ -1,0 +1,355 @@
+import React, { useState, useEffect } from 'react';
+import { Menu, Search, Clipboard, Download, Moon, Sun, Monitor, Github, PlaySquare, Music, ArrowUpRight, Clock, Trash2, X } from 'lucide-react';
+
+const translations = {
+  ko: {
+    titleStart: "음악을 ",
+    titleHighlight: "하나로",
+    titleEnd: " 묶다",
+    subtitle: "어떤 음악 앱의 링크든 붙여넣으세요.\n모두가 들을 수 있는 단축 링크(mus.kn)로 만들어 드립니다.",
+    placeholder: "음악 링크를 붙여넣으세요",
+    howToUse: "사용 방법",
+    contact: "문의하기",
+    android: "Android 앱 설치 (PWA)",
+    ios: "iOS 단축어 추가",
+    mobileNotice: "모바일에서 접속 시 더 편리한 공유가 가능합니다.",
+    themeSystem: "데스크탑 설정 따르기",
+    themeLight: "라이트 모드",
+    themeDark: "다크 모드",
+    clipboardFail: "클립보드 접근이 제한되었습니다. 수동으로 붙여넣기 해주세요.",
+    learnMore: "더 알아보기",
+    searchHistory: "최근 검색",
+    clearHistory: "삭제"
+  },
+  en: {
+    titleStart: "Tie your music ",
+    titleHighlight: "Together",
+    titleEnd: "",
+    subtitle: "Paste a link from any music app.\nWe'll create a universal short link (mus.kn) for everyone.",
+    placeholder: "Paste your music link here",
+    howToUse: "How to use",
+    contact: "Contact us",
+    android: "Install Android App (PWA)",
+    ios: "Add iOS Shortcut",
+    mobileNotice: "Access from a mobile device for a better experience.",
+    themeSystem: "Follow System",
+    themeLight: "Light Mode",
+    themeDark: "Dark Mode",
+    clipboardFail: "Clipboard access is restricted. Please paste manually.",
+    learnMore: "Learn More",
+    searchHistory: "Recent Search",
+    clearHistory: "Clear"
+  }
+};
+
+const mockData1 = {
+  title: "Never Gonna Give You Up",
+  artist: "Rick Astley",
+  album: "Whenever You Need Somebody (1987)",
+  description: "Rick Astley의 데뷔 싱글로, 전 세계적으로 엄청난 히트를 기록한 댄스 팝 곡입니다. 인터넷 밈 '릭롤링(Rickrolling)'으로도 매우 유명합니다.",
+  albumArt: "https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?auto=format&fit=crop&w=500&q=80",
+  prominentColor: "138, 43, 226",
+  mvId: "dQw4w9WgXcQ",
+  hasLastFm: true,
+  links: { 
+    youtubeMusic: "https://www.youtube.com/watch?v=dQw4w9WgXcQ", 
+    spotify: "https://open.spotify.com/track/4PTG3Z6ehGkBFwjybzWkR8", 
+    appleMusic: "https://music.apple.com/kr/song/never-gonna-give-you-up/1559523359", 
+    amazon: "#", 
+    melon: "https://www.melon.com/song/detail.htm?songId=1330018", 
+    bugs: "https://music.bugs.co.kr/track/9027185", 
+    flo: "https://www.music-flo.com/detail/track/571561843/details" 
+  }
+};
+
+const mockData2 = {
+  title: "Example Music 2",
+  artist: "Second Artist",
+  album: "Midnight Vibes (2026)",
+  description: "밤하늘의 별빛을 닮은 신디사이저 사운드가 돋보이는 곡입니다. 공식 뮤직비디오 없이도 많은 사랑을 받았습니다.",
+  albumArt: "https://images.unsplash.com/photo-1514525253161-7a46d19cd819?auto=format&fit=crop&w=500&q=80",
+  prominentColor: "255, 99, 71",
+  mvId: null,
+  hasLastFm: true,
+  links: { youtubeMusic: "#", spotify: "#", appleMusic: "#", amazon: "#", melon: "#", bugs: "#", flo: "#" }
+};
+
+const PlatformIcon = ({ name, color, initial, url }) => (
+  <a 
+    href={url} 
+    target="_blank" 
+    rel="noopener noreferrer"
+    className="flex flex-col items-center justify-center w-full aspect-square rounded-2xl shadow-sm hover:scale-105 transition-transform bg-white dark:bg-zinc-800 border border-gray-100 dark:border-zinc-700/50 cursor-pointer"
+  >
+    <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-lg mb-2`} style={{ backgroundColor: color }}>
+      {initial}
+    </div>
+    <span className="text-[10px] font-semibold text-gray-600 dark:text-gray-300 text-center whitespace-pre-line leading-tight">
+      {name}
+    </span>
+  </a>
+);
+
+export default function App() {
+  const [view, setView] = useState('home');
+  const [urlInput, setUrlInput] = useState('');
+  const [resultData, setResultData] = useState(mockData1);
+  const [theme, setTheme] = useState('system');
+  const [resolvedTheme, setResolvedTheme] = useState('light');
+  const [osType, setOsType] = useState('other');
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isThemeMenuOpen, setIsThemeMenuOpen] = useState(false);
+  const [lang, setLang] = useState('ko');
+  const [isLangMenuOpen, setIsLangMenuOpen] = useState(false);
+  const [hasMv, setHasMv] = useState(true); 
+  const [history, setHistory] = useState(['example_music', 'example_music_2']);
+
+  const t = translations[lang];
+
+  useEffect(() => {
+    const userAgent = window.navigator.userAgent || window.navigator.vendor || window.opera;
+    if (/android/i.test(userAgent)) setOsType('android');
+    else if (/iPad|iPhone|iPod/.test(userAgent) && !window.MSStream) setOsType('ios');
+  }, []);
+
+  useEffect(() => {
+    const root = window.document.documentElement;
+    root.classList.remove('light', 'dark');
+    if (theme === 'system') {
+      const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+      const applySystemTheme = (e) => {
+        const currentTheme = e.matches ? 'dark' : 'light';
+        setResolvedTheme(currentTheme);
+        root.classList.remove('light', 'dark');
+        root.classList.add(currentTheme);
+      };
+      applySystemTheme(mediaQuery);
+      mediaQuery.addEventListener('change', applySystemTheme);
+      return () => mediaQuery.removeEventListener('change', applySystemTheme);
+    } else {
+      setResolvedTheme(theme);
+      root.classList.add(theme);
+    }
+  }, [theme]);
+
+  const handlePaste = async () => {
+    try {
+      const text = await navigator.clipboard.readText();
+      setUrlInput(text);
+    } catch (err) {
+      alert(t.clipboardFail);
+    }
+  };
+
+  const executeSearch = (val) => {
+    if (!val) return;
+    if (val === 'example_music') {
+      setResultData(mockData1);
+      setHasMv(true);
+      setView('result');
+    } else if (val === 'example_music_2') {
+      setResultData(mockData2);
+      setHasMv(false);
+      setView('result');
+    }
+    if (!history.includes(val)) {
+      setHistory(prev => [val, ...prev].slice(0, 5));
+    }
+  };
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    executeSearch(urlInput);
+  };
+
+  const closeAllMenus = () => {
+    setIsMenuOpen(false);
+    setIsThemeMenuOpen(false);
+    setIsLangMenuOpen(false);
+  };
+
+  return (
+    <div className="min-h-screen bg-gray-50 text-gray-900 dark:bg-zinc-950 dark:text-gray-100 font-sans transition-colors duration-500 relative overflow-hidden">
+      {view === 'result' && (
+        <div 
+          className="absolute inset-0 pointer-events-none transition-opacity duration-1000 opacity-60 dark:opacity-30"
+          style={{ background: `radial-gradient(circle at 50% 0%, rgba(${resultData.prominentColor}, 0.5) 0%, transparent 60%)` }}
+        />
+      )}
+
+      {(isMenuOpen || isThemeMenuOpen || isLangMenuOpen) && (
+        <div className="fixed inset-0 z-40" onClick={closeAllMenus} />
+      )}
+
+      <header className="relative flex items-center justify-between p-4 max-w-3xl mx-auto z-50">
+        <div className="flex items-center space-x-3">
+          <div className="relative">
+            <button 
+              onClick={() => { setIsMenuOpen(!isMenuOpen); setIsThemeMenuOpen(false); setIsLangMenuOpen(false); }}
+              className={`p-2 -ml-2 rounded-full transition-all backdrop-blur-sm z-50 relative ${isMenuOpen ? 'bg-gray-200 dark:bg-zinc-800' : 'hover:bg-gray-200/50 dark:hover:bg-zinc-800/50'}`}
+            >
+              {isMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+            </button>
+            {isMenuOpen && (
+              <div className="absolute left-0 top-full mt-2 bg-white/95 dark:bg-zinc-900/95 backdrop-blur-md border border-gray-200/50 dark:border-zinc-800/50 rounded-2xl shadow-xl p-2 z-50 w-48 animate-in fade-in slide-in-from-top-2 origin-top-left">
+                <button className="w-full text-left px-4 py-3 text-sm font-medium hover:bg-gray-100 dark:hover:bg-zinc-800 rounded-xl transition-colors">{t.howToUse}</button>
+                <button className="w-full text-left px-4 py-3 text-sm font-medium hover:bg-gray-100 dark:hover:bg-zinc-800 rounded-xl transition-colors text-red-500">{t.contact}</button>
+              </div>
+            )}
+          </div>
+          
+          <button onClick={() => { setView('home'); setUrlInput(''); closeAllMenus(); }} className="flex items-center font-bold text-xl tracking-tight transition-transform hover:scale-105 active:scale-95">
+            <span className="text-blue-600 dark:text-blue-500 mr-1">🎵</span>
+            Musi<span className="text-blue-600 dark:text-blue-500">knot</span>
+          </button>
+        </div>
+
+        <div className="flex items-center space-x-2">
+          <div className="relative">
+            <button onClick={() => { setIsThemeMenuOpen(!isThemeMenuOpen); setIsLangMenuOpen(false); setIsMenuOpen(false); }} className="p-2 rounded-full hover:bg-gray-200/50 dark:hover:bg-zinc-800/50 transition-colors backdrop-blur-sm">
+              {resolvedTheme === 'dark' ? <Moon className="w-5 h-5" /> : <Sun className="w-5 h-5" />}
+            </button>
+            {isThemeMenuOpen && (
+              <div className="absolute right-0 top-full mt-2 bg-white/95 dark:bg-zinc-900/95 backdrop-blur-md border border-gray-200/50 dark:border-zinc-800/50 rounded-2xl shadow-xl p-2 z-50 w-max min-w-[12rem] animate-in fade-in slide-in-from-top-2 origin-top-right">
+                <button onClick={() => { setTheme('system'); setIsThemeMenuOpen(false); }} className={`flex items-center w-full px-4 py-2.5 text-sm hover:bg-gray-100 dark:hover:bg-zinc-800 rounded-xl ${theme === 'system' ? 'text-blue-500 font-semibold bg-blue-50/50 dark:bg-blue-500/10' : ''}`}><Monitor className="w-4 h-4 mr-3" /> {t.themeSystem}</button>
+                <button onClick={() => { setTheme('light'); setIsThemeMenuOpen(false); }} className={`flex items-center w-full px-4 py-2.5 text-sm hover:bg-gray-100 dark:hover:bg-zinc-800 rounded-xl ${theme === 'light' ? 'text-blue-500 font-semibold bg-blue-50/50 dark:bg-blue-500/10' : ''}`}><Sun className="w-4 h-4 mr-3" /> {t.themeLight}</button>
+                <button onClick={() => { setTheme('dark'); setIsThemeMenuOpen(false); }} className={`flex items-center w-full px-4 py-2.5 text-sm hover:bg-gray-100 dark:hover:bg-zinc-800 rounded-xl ${theme === 'dark' ? 'text-blue-500 font-semibold bg-blue-50/50 dark:bg-blue-500/10' : ''}`}><Moon className="w-4 h-4 mr-3" /> {t.themeDark}</button>
+              </div>
+            )}
+          </div>
+          <div className="relative">
+            <button onClick={() => { setIsLangMenuOpen(!isLangMenuOpen); setIsThemeMenuOpen(false); setIsMenuOpen(false); }} className="p-2 rounded-full hover:bg-gray-200/50 dark:hover:bg-zinc-800/50 transition-colors backdrop-blur-sm text-xl">{lang === 'ko' ? '🇰🇷' : '🇺🇸'}</button>
+            {isLangMenuOpen && (
+              <div className="absolute right-0 top-full mt-2 bg-white/95 dark:bg-zinc-900/95 backdrop-blur-md border border-gray-200/50 dark:border-zinc-800/50 rounded-2xl shadow-xl p-2 z-50 w-max min-w-[8rem] animate-in fade-in slide-in-from-top-2 origin-top-right">
+                <button onClick={() => { setLang('ko'); setIsLangMenuOpen(false); }} className={`flex items-center w-full px-4 py-2.5 text-sm hover:bg-gray-100 dark:hover:bg-zinc-800 rounded-xl ${lang === 'ko' ? 'text-blue-500 font-semibold bg-blue-50/50 dark:bg-blue-500/10' : ''}`}><span className="mr-3">🇰🇷</span> 한국어</button>
+                <button onClick={() => { setLang('en'); setIsLangMenuOpen(false); }} className={`flex items-center w-full px-4 py-2.5 text-sm hover:bg-gray-100 dark:hover:bg-zinc-800 rounded-xl ${lang === 'en' ? 'text-blue-500 font-semibold bg-blue-50/50 dark:bg-blue-500/10' : ''}`}><span className="mr-3">🇺🇸</span> English</button>
+              </div>
+            )}
+          </div>
+        </div>
+      </header>
+
+      {view === 'home' && (
+        <main className="relative z-10 flex flex-col items-center px-4 pt-16 pb-12 max-w-3xl mx-auto space-y-12 animate-in fade-in zoom-in-95 duration-300">
+          <div className="text-center space-y-4 w-full">
+            <h1 className="text-3xl sm:text-5xl font-extrabold tracking-tight">
+              {t.titleStart}
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-500 to-purple-500">{t.titleHighlight}</span>
+              {t.titleEnd}
+            </h1>
+            <p className="text-gray-500 dark:text-gray-400 text-sm sm:text-lg whitespace-pre-line leading-relaxed max-w-xl mx-auto">{t.subtitle}</p>
+          </div>
+
+          <div className="flex flex-col items-center space-y-3 w-full max-w-md">
+            {osType === 'android' && (
+              <button className="w-full flex items-center justify-center px-6 py-4 bg-green-500 hover:bg-green-600 text-white font-semibold rounded-2xl transition-all shadow-lg active:scale-95">
+                <Download className="w-5 h-5 mr-2" /> {t.android}
+              </button>
+            )}
+            {osType === 'ios' && (
+              <button className="w-full flex items-center justify-center px-6 py-4 bg-blue-500 hover:bg-blue-600 text-white font-semibold rounded-2xl transition-all shadow-lg active:scale-95">
+                <Download className="w-5 h-5 mr-2" /> {t.ios}
+              </button>
+            )}
+            {osType === 'other' && (
+              <div className="bg-white/50 dark:bg-zinc-900/50 p-4 rounded-2xl border border-gray-200 dark:border-zinc-800/50 backdrop-blur-sm w-full">
+                <p className="text-xs text-gray-500 dark:text-zinc-500 text-center font-medium leading-snug">{t.mobileNotice}</p>
+              </div>
+            )}
+          </div>
+
+          <div className="w-full max-w-2xl space-y-8">
+            <form onSubmit={handleSubmit} className="relative group">
+              <button type="button" onClick={handlePaste} className="absolute inset-y-0 left-3 my-auto h-12 w-12 flex items-center justify-center text-gray-400 hover:text-blue-500 hover:bg-gray-100 dark:hover:bg-zinc-800 rounded-xl transition-colors z-10"><Clipboard className="h-6 w-6" /></button>
+              <input
+                type="text"
+                value={urlInput}
+                onChange={(e) => setUrlInput(e.target.value)}
+                className="block w-full pl-16 pr-16 py-5 bg-white dark:bg-zinc-900 border-2 border-gray-100 dark:border-zinc-800/50 rounded-3xl text-lg placeholder-gray-400 focus:outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 transition-all shadow-sm group-hover:border-gray-200 dark:group-hover:border-zinc-700"
+                placeholder={t.placeholder}
+                required
+              />
+              <button type="submit" className="absolute inset-y-0 right-3 my-auto h-12 w-12 flex items-center justify-center text-white bg-blue-500 hover:bg-blue-600 rounded-xl transition-colors shadow-md z-10"><Search className="h-6 w-6" /></button>
+            </form>
+
+            {history.length > 0 && (
+              <div className="space-y-4 px-2 animate-in fade-in slide-in-from-bottom-2 duration-500">
+                <div className="flex items-center justify-between text-[11px] font-bold text-gray-400 dark:text-zinc-500 uppercase tracking-widest">
+                  <div className="flex items-center"><Clock className="w-4 h-4 mr-2" /> {t.searchHistory}</div>
+                  <button onClick={() => setHistory([])} className="hover:text-red-500 transition-colors flex items-center"><Trash2 className="w-4 h-4 mr-1.5" /> {t.clearHistory}</button>
+                </div>
+                <div className="flex flex-wrap gap-2.5">
+                  {history.map((item, idx) => (
+                    <button
+                      key={idx}
+                      onClick={() => executeSearch(item)}
+                      className="px-5 py-2.5 bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 rounded-full text-sm font-semibold hover:border-blue-500 hover:text-blue-500 dark:hover:text-blue-400 transition-all shadow-sm hover:shadow-md active:scale-95"
+                    >
+                      {item}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </main>
+      )}
+
+      {view === 'result' && (
+        <main className="relative z-10 flex flex-col items-center px-4 pt-6 pb-20 w-full max-w-lg mx-auto space-y-4 animate-in slide-in-from-bottom-8 fade-in duration-500">
+          <button 
+            onClick={() => setView('home')} 
+            className="self-start mb-2 px-3 py-1 text-sm font-medium text-gray-500 hover:text-blue-500 transition-colors flex items-center"
+          >
+            ← 뒤로가기
+          </button>
+          
+          {hasMv ? (
+            <div className="w-full aspect-video rounded-2xl overflow-hidden shadow-2xl ring-1 ring-black/5 dark:ring-white/10 bg-black">
+              <iframe className="w-full h-full" src={`https://www.youtube.com/embed/${resultData.mvId}?autoplay=0`} title="YouTube" frameBorder="0" allowFullScreen></iframe>
+            </div>
+          ) : (
+            <div className="w-full max-w-[240px] aspect-square rounded-3xl overflow-hidden shadow-2xl ring-1 ring-black/5 dark:ring-white/10 mx-auto mt-4 mb-2 hover:scale-[1.02] transition-transform">
+              <img src={resultData.albumArt} alt="Album Art" className="w-full h-full object-cover" />
+            </div>
+          )}
+
+          <div className="w-full bg-white/70 dark:bg-zinc-900/70 backdrop-blur-2xl border border-white/20 dark:border-zinc-800/50 p-6 rounded-3xl shadow-sm text-center">
+            <h2 className="text-2xl font-extrabold tracking-tight mb-1">{resultData.title}</h2>
+            <div className="flex items-center justify-center text-sm font-semibold text-gray-600 dark:text-gray-300 space-x-2">
+              <span>{resultData.artist}</span>
+              <span>•</span>
+              <span className="truncate max-w-[150px]">{resultData.album}</span>
+            </div>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mt-5 leading-relaxed">{resultData.description}</p>
+          </div>
+
+          {/* '더 알아보기' 버튼 위치를 음악 서비스 아이콘 위로 조정 */}
+          {resultData.hasLastFm && (
+            <div className="w-full flex flex-col items-center space-y-3 py-3">
+              <button className="flex items-center justify-center px-6 py-3 bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 font-bold text-sm rounded-full shadow-lg hover:scale-105 active:scale-95 transition-all">
+                <Music className="w-4 h-4 mr-2" /> {t.learnMore} <ArrowUpRight className="w-4 h-4 ml-1.5 opacity-70" />
+              </button>
+              <span className="text-[10px] text-gray-400 dark:text-zinc-600 tracking-widest uppercase font-bold">Powered by Last.fm</span>
+            </div>
+          )}
+
+          <div className="w-full space-y-4 pt-4">
+            <div className="grid grid-cols-4 gap-3">
+              <PlatformIcon name="Spotify" color="#1DB954" initial="S" url={resultData.links.spotify} />
+              <PlatformIcon name={"Apple\nMusic"} color="#FA243C" initial="A" url={resultData.links.appleMusic} />
+              <PlatformIcon name="YT Music" color="#FF0000" initial="Y" url={resultData.links.youtubeMusic} />
+              <PlatformIcon name="Amazon" color="#00A8E1" initial="a" url={resultData.links.amazon} />
+            </div>
+            <div className="px-2"><hr className="border-t border-gray-200/50 dark:border-zinc-800/50" /></div>
+            <div className="grid grid-cols-3 gap-3">
+              <PlatformIcon name="Melon" color="#00CD3C" initial="M" url={resultData.links.melon} />
+              <PlatformIcon name="Bugs" color="#FF3C28" initial="B" url={resultData.links.bugs} />
+              <PlatformIcon name="FLO" color="#4115EE" initial="F" url={resultData.links.flo} />
+            </div>
+          </div>
+        </main>
+      )}
+    </div>
+  );
+}
