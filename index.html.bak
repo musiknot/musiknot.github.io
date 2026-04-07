@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Musiknot - 음악을 하나로 묶다</title>
+    <!-- 외부 라이브러리 로드 -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; -webkit-font-smoothing: antialiased; }
+        .backdrop-blur-xl { backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px); }
+        .animate-in { animation: fadeIn 0.4s ease-out forwards; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .platform-card:hover { transform: translateY(-4px); }
+        [data-lucide] { stroke-width: 2.5; }
+        .transition-colors { transition-property: background-color, border-color, color, fill, stroke; transition-duration: 500ms; }
+    </style>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+        }
+    </script>
+</head>
+<body class="bg-gray-50 text-gray-900 dark:bg-zinc-950 dark:text-zinc-100 transition-colors">
+    <div id="app-container" class="min-h-screen relative overflow-x-hidden">
+        
+        <!-- 배경 그라데이션 -->
+        <div id="bg-gradient" class="absolute inset-0 pointer-events-none opacity-0 transition-opacity duration-1000" 
+             style="background: radial-gradient(circle at 50% 0%, rgba(138, 43, 226, 0.4) 0%, transparent 60%);"></div>
+
+        <!-- 헤더 -->
+        <header class="relative flex items-center justify-between p-4 max-w-3xl mx-auto z-50">
+            <div class="flex items-center space-x-3">
+                <div class="relative">
+                    <button onclick="toggleMenu(event)" class="p-2 -ml-2 rounded-full hover:bg-gray-200/50 dark:hover:bg-zinc-800/50 transition-all z-50 relative">
+                        <i data-lucide="menu" id="menu-icon" class="w-6 h-6 text-gray-900 dark:text-zinc-100"></i>
+                    </button>
+                    <div id="dropdown-menu" class="hidden absolute left-0 top-full mt-2 bg-white/95 dark:bg-zinc-900/95 backdrop-blur-xl border border-gray-200 dark:border-zinc-800 rounded-2xl shadow-xl p-2 z-50 w-48 animate-in origin-top-left">
+                        <button class="w-full text-left px-4 py-3 text-sm font-bold hover:bg-gray-100 dark:hover:bg-zinc-800 rounded-xl transition-colors lang-text" data-key="howToUse">사용 방법</button>
+                        <button class="w-full text-left px-4 py-3 text-sm font-bold hover:bg-gray-100 dark:hover:bg-zinc-800 rounded-xl text-red-500 transition-colors lang-text" data-key="contact">문의하기</button>
+                    </div>
+                </div>
+                <button onclick="goHome()" class="flex items-center font-bold text-xl tracking-tight hover:scale-105 transition-transform">
+                    <span class="text-blue-600 mr-1">🎵</span>
+                    Musi<span class="text-blue-600 dark:text-blue-500">knot</span>
+                </button>
+            </div>
+
+            <div class="flex items-center space-x-2">
+                <div class="relative">
+                    <button onclick="toggleThemeMenu(event)" class="p-2 rounded-full hover:bg-gray-200/50 dark:hover:bg-zinc-800/50 transition-colors">
+                        <i data-lucide="sun" id="theme-icon" class="w-5 h-5 text-gray-900 dark:text-zinc-100"></i>
+                    </button>
+                    <div id="theme-menu" class="hidden absolute right-0 top-full mt-2 bg-white/95 dark:bg-zinc-900/95 backdrop-blur-xl border border-gray-200 dark:border-zinc-800 rounded-2xl shadow-xl p-2 z-50 w-48 animate-in origin-top-right">
+                        <button onclick="setTheme('system')" class="flex items-center w-full px-4 py-2.5 text-sm font-bold hover:bg-gray-100 dark:hover:bg-zinc-800 rounded-xl transition-colors"><i data-lucide="monitor" class="w-4 h-4 mr-3"></i> <span class="lang-text" data-key="themeSystem">데스크탑 설정</span></button>
+                        <button onclick="setTheme('light')" class="flex items-center w-full px-4 py-2.5 text-sm font-bold hover:bg-gray-100 dark:hover:bg-zinc-800 rounded-xl transition-colors"><i data-lucide="sun" class="w-4 h-4 mr-3"></i> <span class="lang-text" data-key="themeLight">라이트 모드</span></button>
+                        <button onclick="setTheme('dark')" class="flex items-center w-full px-4 py-2.5 text-sm font-bold hover:bg-gray-100 dark:hover:bg-zinc-800 rounded-xl transition-colors"><i data-lucide="moon" class="w-4 h-4 mr-3"></i> <span class="lang-text" data-key="themeDark">다크 모드</span></button>
+                    </div>
+                </div>
+                <div class="relative">
+                    <button onclick="toggleLangMenu(event)" id="lang-btn" class="p-2 rounded-full hover:bg-gray-200/50 dark:hover:bg-zinc-800/50 transition-colors text-xl">🇰🇷</button>
+                    <div id="lang-menu" class="hidden absolute right-0 top-full mt-2 bg-white/95 dark:bg-zinc-900/95 backdrop-blur-xl border border-gray-200 dark:border-zinc-800 rounded-2xl shadow-xl p-2 z-50 w-32 animate-in origin-top-right">
+                        <button onclick="setLanguage('ko')" class="flex items-center w-full px-4 py-2.5 text-sm font-bold hover:bg-gray-100 dark:hover:bg-zinc-800 rounded-xl transition-colors"><span class="mr-3">🇰🇷</span> 한국어</button>
+                        <button onclick="setLanguage('en')" class="flex items-center w-full px-4 py-2.5 text-sm font-bold hover:bg-gray-100 dark:hover:bg-zinc-800 rounded-xl transition-colors"><span class="mr-3">🇺🇸</span> English</button>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- 홈 뷰 -->
+        <main id="home-view" class="relative z-10 flex flex-col items-center px-4 pt-16 pb-12 max-w-3xl mx-auto space-y-12 animate-in">
+            <div class="text-center space-y-4 w-full">
+                <h1 class="text-3xl sm:text-5xl font-extrabold tracking-tight">
+                    <span class="lang-text" data-key="titleStart">음악을 </span><span class="text-transparent bg-clip-text bg-gradient-to-r from-blue-500 to-purple-500 lang-text" data-key="titleHighlight">하나로</span><span class="lang-text" data-key="titleEnd"> 묶다</span>
+                </h1>
+                <p class="text-gray-500 dark:text-zinc-400 text-sm sm:text-lg max-w-xl mx-auto leading-relaxed whitespace-pre-line lang-text" data-key="subtitle">
+                    어떤 음악 앱의 링크든 붙여넣으세요. 모두가 들을 수 있는 단축 링크(mus.kn)로 만들어 드립니다.
+                </p>
+            </div>
+
+            <div class="bg-white/80 dark:bg-zinc-900/80 border border-gray-200 dark:border-zinc-800 p-5 rounded-2xl backdrop-blur-sm w-full max-w-md shadow-sm">
+                <p class="text-xs text-gray-700 dark:text-zinc-200 text-center font-bold leading-snug lang-text" data-key="mobileNotice">모바일 기기에서 접속하시면 더 편리한 공유 기능을 사용할 수 있습니다.</p>
+            </div>
+
+            <div class="w-full max-w-2xl space-y-8">
+                <form id="search-form" class="relative group" onsubmit="handleSearch(event)">
+                    <button type="button" onclick="pasteFromClipboard()" class="absolute inset-y-0 left-3 my-auto h-12 w-12 flex items-center justify-center text-gray-400 hover:text-blue-500 hover:bg-gray-100 dark:hover:bg-zinc-800 rounded-xl transition-colors z-10">
+                        <i data-lucide="clipboard" class="h-6 w-6"></i>
+                    </button>
+                    <input type="text" id="url-input"
+                           class="block w-full pl-16 pr-16 py-5 bg-white dark:bg-zinc-900 border-2 border-gray-200 dark:border-zinc-800 rounded-3xl text-lg placeholder-gray-400 dark:text-zinc-100 focus:outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 transition-all shadow-sm group-hover:border-gray-300 dark:group-hover:border-zinc-700">
+                    <button type="submit" class="absolute inset-y-0 right-3 my-auto h-12 w-12 flex items-center justify-center text-white bg-blue-500 hover:bg-blue-600 rounded-xl transition-colors shadow-md z-10">
+                        <i data-lucide="search" class="h-6 w-6"></i>
+                    </button>
+                </form>
+
+                <div class="space-y-4 px-2">
+                    <div class="flex items-center justify-between text-[11px] font-bold text-gray-400 dark:text-zinc-500 uppercase tracking-widest">
+                        <div class="flex items-center"><i data-lucide="clock" class="w-3.5 h-3.5 mr-2"></i> <span class="lang-text" data-key="searchHistory">최근 검색</span></div>
+                        <button onclick="clearHistory()" class="hover:text-red-500 transition-colors flex items-center"><i data-lucide="trash-2" class="w-3.5 h-3.5 mr-1.5"></i> <span class="lang-text" data-key="clearHistory">삭제</span></button>
+                    </div>
+                    <div id="history-container" class="flex flex-wrap gap-2.5"></div>
+                </div>
+            </div>
+        </main>
+
+        <!-- 결과 뷰 -->
+        <main id="result-view" class="hidden relative z-10 flex flex-col items-center px-4 pt-6 pb-20 w-full max-w-lg mx-auto space-y-4 animate-in">
+            <button onclick="goHome()" class="self-start mb-2 px-3 py-1 text-sm font-bold text-gray-500 hover:text-blue-500 transition-colors flex items-center">
+                ← <span class="lang-text" data-key="back">뒤로가기</span>
+            </button>
+            <div id="media-container" class="w-full aspect-video rounded-2xl overflow-hidden shadow-2xl ring-1 ring-black/5 bg-black"></div>
+            <div class="w-full bg-white/70 dark:bg-zinc-900/70 backdrop-blur-2xl border border-gray-200 dark:border-zinc-800 p-6 rounded-3xl shadow-sm text-center">
+                <h2 id="res-title" class="text-2xl font-extrabold tracking-tight mb-1">곡 제목</h2>
+                <div class="flex items-center justify-center text-sm font-semibold text-gray-600 dark:text-zinc-300 space-x-2">
+                    <span id="res-artist">아티스트</span><span>•</span><span id="res-album" class="truncate max-w-[150px]">앨범명</span>
+                </div>
+                <p id="res-desc" class="text-sm text-gray-500 dark:text-zinc-400 mt-5 leading-relaxed">설명글</p>
+            </div>
+            <div class="w-full flex flex-col items-center space-y-3 py-3">
+                <button class="flex items-center justify-center px-6 py-3 bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 font-bold text-sm rounded-full shadow-lg hover:scale-105 active:scale-95 transition-all">
+                    <i data-lucide="music" class="w-4 h-4 mr-2"></i> <span class="lang-text" data-key="learnMore">더 알아보기</span> <i data-lucide="arrow-up-right" class="w-4 h-4 ml-1.5 opacity-70"></i>
+                </button>
+                <span class="text-[10px] text-gray-400 dark:text-zinc-600 tracking-widest uppercase font-bold">Powered by Last.fm</span>
+            </div>
+            <div id="links-grid" class="w-full space-y-4 pt-4"></div>
+        </main>
+    </div>
+
+    <script>
+        const translations = {
+            ko: {
+                titleStart: "음악을 ", titleHighlight: "하나로", titleEnd: " 묶다",
+                subtitle: "어떤 음악 앱의 링크든 붙여넣으세요.\n모두가 들을 수 있는 단축 링크(mus.kn)로 만들어 드립니다.",
+                placeholder: "음악 링크를 붙여넣으세요",
+                howToUse: "사용 방법", contact: "문의하기",
+                themeSystem: "데스크탑 설정", themeLight: "라이트 모드", themeDark: "다크 모드",
+                mobileNotice: "모바일 기기에서 접속하시면 더 편리한 공유 기능을 사용할 수 있습니다.",
+                searchHistory: "최근 검색", clearHistory: "삭제",
+                learnMore: "더 알아보기", back: "뒤로가기"
+            },
+            en: {
+                titleStart: "Tie your music ", titleHighlight: "Together", titleEnd: "",
+                subtitle: "Paste a link from any music app.\nWe'll create a universal short link (mus.kn) for everyone.",
+                placeholder: "Paste your music link here",
+                howToUse: "How to use", contact: "Contact us",
+                themeSystem: "Follow System", themeLight: "Light Mode", themeDark: "Dark Mode",
+                mobileNotice: "Access from a mobile device for a better experience.",
+                searchHistory: "Recent Search", clearHistory: "Clear",
+                learnMore: "Learn More", back: "Back"
+            }
+        };
+
+        const mockData = {
+            'example_music': {
+                title: "Never Gonna Give You Up", artist: "Rick Astley", album: "Whenever You Need Somebody (1987)",
+                description: "Rick Astley의 데뷔 싱글로, 전 세계적으로 히트한 곡입니다. 릭롤링 밈으로 유명합니다.",
+                albumArt: "https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?auto=format&fit=crop&w=500&q=80",
+                mvId: "dQw4w9WgXcQ", color: "138, 43, 226"
+            },
+            'example_music_2': {
+                title: "Example Music 2", artist: "Second Artist", album: "Midnight Vibes (2026)",
+                description: "밤하늘의 별빛을 닮은 신디사이저 사운드가 돋보이는 곡입니다.",
+                albumArt: "https://images.unsplash.com/photo-1514525253161-7a46d19cd819?auto=format&fit=crop&w=500&q=80",
+                mvId: null, color: "255, 99, 71"
+            }
+        };
+
+        let currentLang = 'ko';
+        let currentTheme = 'system';
+        let historyList = ['example_music', 'example_music_2'];
+
+        function init() {
+            setTheme('system');
+            setLanguage('ko');
+            renderHistory();
+            lucide.createIcons();
+        }
+
+        function setLanguage(lang) {
+            currentLang = lang;
+            document.getElementById('lang-btn').innerText = lang === 'ko' ? '🇰🇷' : '🇺🇸';
+            const elements = document.querySelectorAll('.lang-text');
+            elements.forEach(el => {
+                const key = el.getAttribute('data-key');
+                if (translations[lang][key] !== undefined) {
+                    el.innerText = translations[lang][key];
+                }
+            });
+            document.getElementById('url-input').placeholder = translations[lang].placeholder;
+            closeAllMenus();
+        }
+
+        function setTheme(theme) {
+            currentTheme = theme;
+            const root = document.documentElement;
+            const isDark = theme === 'dark' || (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+            
+            if (isDark) root.classList.add('dark');
+            else root.classList.remove('dark');
+            
+            updateThemeUI(isDark);
+            closeAllMenus();
+        }
+
+        function updateThemeUI(isDark) {
+            const themeIcon = document.getElementById('theme-icon');
+            const menuIcon = document.getElementById('menu-icon');
+            themeIcon.setAttribute('data-lucide', isDark ? 'moon' : 'sun');
+            lucide.createIcons();
+            renderHistory();
+        }
+
+        function toggleMenu(e) { 
+            e.stopPropagation(); 
+            const menu = document.getElementById('dropdown-menu');
+            const isHidden = menu.classList.contains('hidden');
+            closeAllMenus(); 
+            if (isHidden) menu.classList.remove('hidden');
+            updateMenuIcons();
+        }
+        
+        function toggleThemeMenu(e) { e.stopPropagation(); toggleDisplay('theme-menu'); }
+        function toggleLangMenu(e) { e.stopPropagation(); toggleDisplay('lang-menu'); }
+
+        function toggleDisplay(id) {
+            const el = document.getElementById(id);
+            const isHidden = el.classList.contains('hidden');
+            closeAllMenus();
+            if (isHidden) el.classList.remove('hidden');
+            updateMenuIcons();
+        }
+
+        function closeAllMenus() {
+            ['dropdown-menu', 'theme-menu', 'lang-menu'].forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.classList.add('hidden');
+            });
+            updateMenuIcons();
+        }
+
+        function updateMenuIcons() {
+            const menuIcon = document.getElementById('menu-icon');
+            const isMenuVisible = !document.getElementById('dropdown-menu').classList.contains('hidden');
+            menuIcon.setAttribute('data-lucide', isMenuVisible ? 'x' : 'menu');
+            
+            const themeIcon = document.getElementById('theme-icon');
+            const isDark = document.documentElement.classList.contains('dark');
+            themeIcon.setAttribute('data-lucide', isDark ? 'moon' : 'sun');
+            lucide.createIcons();
+        }
+
+        function renderHistory() {
+            const container = document.getElementById('history-container');
+            container.innerHTML = '';
+            historyList.forEach(item => {
+                const btn = document.createElement('button');
+                btn.className = "px-5 py-2.5 bg-white dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-full text-sm font-bold text-gray-800 dark:text-zinc-100 hover:border-blue-500 hover:text-blue-500 dark:hover:text-blue-400 transition-all shadow-sm active:scale-95";
+                btn.innerText = item;
+                btn.onclick = () => executeSearch(item);
+                container.appendChild(btn);
+            });
+        }
+
+        function handleSearch(e) { e.preventDefault(); executeSearch(document.getElementById('url-input').value); }
+
+        function executeSearch(val) {
+            const data = mockData[val];
+            if (!data) { alert('Mock Data Only: example_music'); return; }
+            document.getElementById('home-view').classList.add('hidden');
+            document.getElementById('result-view').classList.remove('hidden');
+            document.getElementById('bg-gradient').style.opacity = '1';
+            document.getElementById('bg-gradient').style.background = `radial-gradient(circle at 50% 0%, rgba(${data.color}, 0.4) 0%, transparent 60%)`;
+            
+            document.getElementById('res-title').innerText = data.title;
+            document.getElementById('res-artist').innerText = data.artist;
+            document.getElementById('res-album').innerText = data.album;
+            document.getElementById('res-desc').innerText = data.description;
+
+            const mc = document.getElementById('media-container');
+            if (data.mvId) {
+                mc.innerHTML = `<iframe class="w-full h-full" src="https://www.youtube.com/embed/${data.mvId}"></iframe>`;
+                mc.className = "w-full aspect-video rounded-2xl overflow-hidden shadow-2xl bg-black";
+            } else {
+                mc.innerHTML = `<img src="${data.albumArt}" class="w-full h-full object-cover">`;
+                mc.className = "w-full max-w-[240px] aspect-square rounded-3xl overflow-hidden shadow-2xl mx-auto mt-4 mb-2";
+            }
+            renderLinks();
+            window.scrollTo(0,0);
+            updateMenuIcons();
+        }
+
+        function renderLinks() {
+            document.getElementById('links-grid').innerHTML = `
+                <div class="grid grid-cols-4 gap-3">
+                    ${pIcon("Spotify", "#1DB954", "S")} ${pIcon("Apple\nMusic", "#FA243C", "A")}
+                    ${pIcon("YT Music", "#FF0000", "Y")} ${pIcon("Amazon", "#00A8E1", "a")}
+                </div>
+                <div class="px-2"><hr class="border-t border-gray-200 dark:border-zinc-800"></div>
+                <div class="grid grid-cols-3 gap-3">
+                    ${pIcon("Melon", "#00CD3C", "M")} ${pIcon("Bugs", "#FF3C28", "B")} ${pIcon("FLO", "#4115EE", "F")}
+                </div>`;
+        }
+
+        function pIcon(n, c, i) {
+            return `<div class="flex flex-col items-center justify-center w-full aspect-square rounded-2xl shadow-sm bg-white dark:bg-zinc-800 border border-gray-100 dark:border-zinc-800 platform-card cursor-pointer">
+                <div class="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-lg mb-2" style="background-color: ${c}">${i}</div>
+                <span class="text-[10px] font-bold text-gray-800 dark:text-zinc-200 text-center whitespace-pre-line leading-tight">${n}</span>
+            </div>`;
+        }
+
+        function goHome() {
+            document.getElementById('home-view').classList.remove('hidden');
+            document.getElementById('result-view').classList.add('hidden');
+            document.getElementById('bg-gradient').style.opacity = '0';
+            document.getElementById('url-input').value = '';
+            closeAllMenus();
+        }
+
+        function clearHistory() { historyList = []; renderHistory(); }
+        function pasteFromClipboard() { navigator.clipboard.readText().then(t => document.getElementById('url-input').value = t); }
+
+        window.onclick = () => closeAllMenus();
+        window.onload = init;
+    </script>
+</body>
+</html>
