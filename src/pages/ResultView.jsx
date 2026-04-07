@@ -4,6 +4,8 @@ import { PlatformGrid } from '../components/PlatformGrid'
 export function ResultView({ song, onBack, t }) {
     if (!song) return null
 
+    const hasMV = !!song.platforms?.youtube
+
     return (
         <main className="relative z-10 flex flex-col items-center px-4 pt-6 pb-20 w-full max-w-lg mx-auto space-y-4">
 
@@ -15,12 +17,12 @@ export function ResultView({ song, onBack, t }) {
                 ← {t('back')}
             </button>
 
-            {/* 미디어 (MV or 앨범아트) */}
-            {song.mvId ? (
+            {/* 미디어: MV 있으면 YouTube embed, 없으면 앨범아트 */}
+            {hasMV ? (
                 <div className="w-full aspect-video rounded-2xl overflow-hidden shadow-2xl ring-1 ring-black/5 bg-black">
                     <iframe
                         className="w-full h-full"
-                        src={`https://www.youtube.com/embed/${song.mvId}`}
+                        src={`https://www.youtube.com/embed/${song.platforms.youtube}`}
                         allowFullScreen
                     />
                 </div>
@@ -44,9 +46,11 @@ export function ResultView({ song, onBack, t }) {
                     <span>•</span>
                     <span className="truncate max-w-[150px]">{song.album}</span>
                 </div>
-                <p className="text-sm text-gray-500 dark:text-zinc-400 mt-5 leading-relaxed">
-                    {song.description}
-                </p>
+                {song.isrc && (
+                    <p className="text-xs text-gray-400 dark:text-zinc-500 mt-2">
+                        ISRC: {song.isrc}
+                    </p>
+                )}
             </div>
 
             {/* 더 알아보기 버튼 */}
