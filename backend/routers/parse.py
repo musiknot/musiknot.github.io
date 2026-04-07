@@ -1,4 +1,5 @@
 import sys
+import os
 import asyncio
 from fastapi import APIRouter, HTTPException
 from models.schemas import ParseRequest, ParseResponse, PlatformIds
@@ -39,10 +40,6 @@ async def get_song_info_from_platform(platform: str, song_id: str) -> dict | Non
                     }
         except Exception as e:
             print(f"[Parse] iTunes lookup 실패: {e}")
-        return None
-
-    if platform in ("youtube", "youtubeMusic"):
-        print(f"[Parse] {platform} 곡 정보 조회 미구현")
         return None
 
     if platform == "melon":
@@ -124,6 +121,42 @@ async def get_song_info_from_platform(platform: str, song_id: str) -> dict | Non
         except Exception as e:
             print(f"[Parse] FLO API 실패: {e}")
         return None
+    
+    if platform in ("youtube", "youtubeMusic"):
+        import httpx
+        try:
+            async with httpx.AsyncClient(timeout=5) as client:
+                res = await client.get(
+                    "https://www.googleapis.com/youtube/v3/videos",
+                    params={
+                        "part": "snippet",
+                        "id":   song_id,
+                        "key":  os.getenv("YOUTUBE_API_KEY"),
+                    }
+                )
+                items = res.json().get("items", [])
+                if items:
+                    snippet    = items[0]["snippet"]
+                    title      = snippet.get("title", "")
+                    channel    = snippet.get("channelTitle", "")
+                    # "The Weeknd - Blinding Lights (Official Video)" 형식에서 파싱
+                    if " - " in title:
+                        artist, song = title.split(" - ", 1)
+                        # "(Official Video)" 등 제거
+                        import re
+                        song = re.sub(r'\s*[\(\[].*?[\)\]]', '', song).strip()
+                    else:
+                        artist = channel
+                        song   = title
+                    return {
+                        "title":    song,
+                        "artist":   artist,
+                        "album":    None,
+                        "albumArt": None,
+                    }
+        except Exception as e:
+            print(f"[Parse] YouTube 곡 정보 실패: {e}")
+    return None
 
     return None
 
@@ -251,11 +284,14 @@ async def parse_url(req: ParseRequest):
     # STEP 4: 나머지 플랫폼 ID 조회
     platform_ids = await get_all_platform_ids(title, artist, platform, song_id)
 
-    # Apple Music 결과에서 albumArt 업그레이드
-    if not albumArt and platform_ids.appleMusic:
+    # Apple Music 결과에서 albumArt, album 업그레이드
+    if not albumArt or not album:
         result = await search_itunes(title, artist)
         if result:
-            albumArt = result["albumArt"]
+            if not albumArt:
+                albumArt = result["albumArt"]
+            if not album:
+                album = result["album"]
 
     return ParseResponse(
         title     = title,
