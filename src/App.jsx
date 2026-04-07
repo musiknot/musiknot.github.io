@@ -1,62 +1,44 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useTheme } from './hooks/useTheme'
 import { useLanguage } from './hooks/useLanguage'
+import { useParse } from './hooks/useParse'
 import { Header } from './components/Header'
 import { HomeView } from './pages/HomeView'
 import { ResultView } from './pages/ResultView'
 
-const mockData = {
-    'example_music': {
-        title:       "Never Gonna Give You Up",
-        artist:      "Rick Astley",
-        album:       "Whenever You Need Somebody (1987)",
-        description: "Rick Astley의 데뷔 싱글로, 전 세계적으로 히트한 곡입니다. 릭롤링 밈으로 유명합니다.",
-        albumArt:    "https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?auto=format&fit=crop&w=500&q=80",
-        mvId:        "dQw4w9WgXcQ",
-        color:       "138, 43, 226"
-    },
-    'example_music_2': {
-        title:       "Example Music 2",
-        artist:      "Second Artist",
-        album:       "Midnight Vibes (2026)",
-        description: "밤하늘의 별빛을 닮은 신디사이저 사운드가 돋보이는 곡입니다.",
-        albumArt:    "https://images.unsplash.com/photo-1514525253161-7a46d19cd819?auto=format&fit=crop&w=500&q=80",
-        mvId:        null,
-        color:       "255, 99, 71"
-    }
-}
-
 export default function App() {
-    const { theme, setTheme, isDark }     = useTheme()
-    const { lang, setLanguage, t }        = useLanguage()
-    const [currentSong, setCurrentSong]   = useState(null)
-    const [history, setHistory]           = useState(['example_music', 'example_music_2'])
+    const { theme, setTheme, isDark }   = useTheme()
+    const { lang, setLanguage, t }      = useLanguage()
+    const { result, loading, error, parse, reset } = useParse()
+    const [history, setHistory]         = useState([])
+
+    // ?url= 파라미터로 자동 검색
+    useEffect(() => {
+        const params = new URLSearchParams(window.location.search)
+        const url = params.get('url')
+        if (url) handleSearch(url)
+    }, [])
 
     const handleSearch = (val) => {
-        const data = mockData[val]
-        if (!data) {
-            alert('Mock Data Only: example_music / example_music_2')
-            return
-        }
-        // 히스토리 추가 (중복 제거)
+        // 히스토리 추가 (중복 제거, 최대 10개)
         setHistory(prev => [val, ...prev.filter(h => h !== val)].slice(0, 10))
-        setCurrentSong(data)
+        parse(val)
         window.scrollTo(0, 0)
     }
 
-    const handleBack = () => setCurrentSong(null)
+    const handleBack = () => {
+        reset()
+    }
 
     return (
-        <div
-            className="min-h-screen relative overflow-x-hidden bg-gray-50 text-gray-900 dark:bg-zinc-950 dark:text-zinc-100 transition-colors duration-500"
-            onClick={() => {}}
-        >
+        <div className="min-h-screen relative overflow-x-hidden bg-gray-50 text-gray-900 dark:bg-zinc-950 dark:text-zinc-100 transition-colors duration-500">
+
             {/* 배경 그라데이션 */}
-            {currentSong && (
+            {result && (
                 <div
                     className="absolute inset-0 pointer-events-none transition-opacity duration-1000"
                     style={{
-                        background: `radial-gradient(circle at 50% 0%, rgba(${currentSong.color}, 0.4) 0%, transparent 60%)`
+                        background: `radial-gradient(circle at 50% 0%, rgba(138, 43, 226, 0.4) 0%, transparent 60%)`
                     }}
                 />
             )}
@@ -72,21 +54,50 @@ export default function App() {
                 onHome={handleBack}
             />
 
+            {/* 로딩 */}
+            {loading && (
+                <div className="flex items-center justify-center pt-32">
+                    <div className="flex flex-col items-center space-y-4">
+                        <div className="w-10 h-10 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
+                        <p className="text-sm text-gray-500 dark:text-zinc-400">
+                            검색 중...
+                        </p>
+                    </div>
+                </div>
+            )}
+
+            {/* 에러 */}
+            {!loading && error && (
+                <div className="flex items-center justify-center pt-32">
+                    <div className="text-center space-y-4">
+                        <p className="text-red-500 font-bold">{error}</p>
+                        <button
+                            onClick={handleBack}
+                            className="px-4 py-2 text-sm font-bold text-blue-500 hover:underline"
+                        >
+                            ← {t('back')}
+                        </button>
+                    </div>
+                </div>
+            )}
+
             {/* 뷰 전환 */}
-            {currentSong ? (
-                <ResultView
-                    song={currentSong}
-                    onBack={handleBack}
-                    t={t}
-                />
-            ) : (
-                <HomeView
-                    onSearch={handleSearch}
-                    history={history}
-                    onHistoryClick={handleSearch}
-                    onClearHistory={() => setHistory([])}
-                    t={t}
-                />
+            {!loading && !error && (
+                result ? (
+                    <ResultView
+                        song={result}
+                        onBack={handleBack}
+                        t={t}
+                    />
+                ) : (
+                    <HomeView
+                        onSearch={handleSearch}
+                        history={history}
+                        onHistoryClick={handleSearch}
+                        onClearHistory={() => setHistory([])}
+                        t={t}
+                    />
+                )
             )}
         </div>
     )

@@ -62,7 +62,7 @@ export function ResultView({ song, onBack, t }) {
             </div>
 
             {/* 플랫폼 링크 그리드 */}
-            <PlatformGrid />
+            <PlatformGrid platformIds={song.platforms} />
         </main>
     )
 }

@@ -1,7 +1,8 @@
 import { PlatformCard } from './PlatformCard'
 import { platforms } from '../constants/platforms'
 
-export function PlatformGrid() {
+export function PlatformGrid({ platformIds }) {
+    console.log("platformIds:", platformIds)  // ← 추가
     return (
         <div className="w-full space-y-4">
             {/* 글로벌 플랫폼 */}
@@ -10,7 +11,8 @@ export function PlatformGrid() {
                     <PlatformCard
                         key={p.id}
                         platform={p}
-                        onClick={() => console.log(`${p.id} 클릭`)}
+                        songId={platformIds?.[p.id]}
+                        disabled={!platformIds?.[p.id]}
                     />
                 ))}
             </div>
@@ -25,7 +27,8 @@ export function PlatformGrid() {
                     <PlatformCard
                         key={p.id}
                         platform={p}
-                        onClick={() => console.log(`${p.id} 클릭`)}
+                        songId={platformIds?.[p.id]}
+                        disabled={!platformIds?.[p.id]}
                     />
                 ))}
             </div>
