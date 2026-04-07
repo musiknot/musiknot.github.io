@@ -14,9 +14,28 @@ export default function App() {
 
     // ?url= 파라미터로 자동 검색
     useEffect(() => {
+        // ?url= 파라미터 처리 (기존)
         const params = new URLSearchParams(window.location.search)
-        const url = params.get('url')
-        if (url) handleSearch(url)
+        const urlParam = params.get('url')
+        if (urlParam) {
+            handleSearch(urlParam)
+            return
+        }
+
+        // /gets/ 경로 처리 (Base64 디코딩)
+        const path = window.location.pathname
+        const getsPrefix = '/gets/'
+        if (path.startsWith(getsPrefix)) {
+            const encoded = path.slice(getsPrefix.length)
+            if (encoded) {
+                try {
+                    const decoded = atob(encoded)  // Base64 디코딩
+                    handleSearch(decoded)
+                } catch {
+                    console.error('Base64 디코딩 실패')
+                }
+            }
+        }
     }, [])
 
     const handleSearch = (val) => {
