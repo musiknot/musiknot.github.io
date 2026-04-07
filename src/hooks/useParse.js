@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { validateUrl } from '../utils/urlValidator'
 
-const API_URL = 'http://localhost:8000'
+const API_URL = 'https://musiknotgithubio-production.up.railway.app'
 
 const mockDB = {
     // Blinding Lights - MV 있음
@@ -67,7 +67,7 @@ export function useParse() {
                 throw new Error('지원하지 않는 링크입니다.')
             }
 
-            /*
+            
             const res = await fetch(`${API_URL}/parse`, {
                 method:  'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -75,13 +75,13 @@ export function useParse() {
             })
             if (!res.ok) throw new Error('서버 오류')
             setResult(await res.json())
-            */
-
+            
+/*
             await new Promise(r => setTimeout(r, 800))
             const mock = getMockResponse(input)
             if (!mock) throw new Error('등록되지 않은 링크입니다. (Mock DB)')
             setResult(mock)
-
+*/
         } catch (e) {
             setError(e.message)
         } finally {
