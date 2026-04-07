@@ -1,9 +1,7 @@
 import { useState } from 'react'
 import { validateUrl } from '../utils/urlValidator'
 
-const API_URL = import.meta.env.DEV 
-    ? 'http://localhost:8000'
-    : 'https://musiknotgithubio-production.up.railway.app'
+const API_URL = 'https://musiknotgithubio-production.up.railway.app'
 
 const mockDB = {
     // Blinding Lights - MV 있음
