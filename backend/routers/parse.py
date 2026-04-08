@@ -48,9 +48,14 @@ async def get_song_info_from_platform(platform: str, song_id: str) -> dict | Non
         try:
             res = requests.get(
                 f"https://www.melon.com/song/detail.htm?songId={song_id}",
-                headers={"User-Agent": "Chrome"},
-                timeout=5
-            )
+                headers={
+                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+                    "Accept-Language": "ko-KR,ko;q=0.9",
+                    "Referer": "https://www.melon.com",
+                },
+            timeout=5
+)
             print(f"[Melon] status: {res.status_code}")
             doc = BeautifulSoup(res.text, "html.parser")
             title  = doc.select_one("div.song_name strong")
