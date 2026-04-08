@@ -51,11 +51,13 @@ async def get_song_info_from_platform(platform: str, song_id: str) -> dict | Non
                 headers={"User-Agent": "Chrome"},
                 timeout=5
             )
+            print(f"[Melon] status: {res.status_code}")
             doc = BeautifulSoup(res.text, "html.parser")
             title  = doc.select_one("div.song_name strong")
             artist = doc.select_one("div.artist_name span.ellipsis")
             album  = doc.select_one("div.song_info dl dd.ellipsis")
             art    = doc.select_one("div.thumb img")
+            print(f"[Melon] title: {title}, artist: {artist}")
             if title and artist:
                 return {
                     "title":    title.text.strip(),
