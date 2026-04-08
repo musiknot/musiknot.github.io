@@ -43,35 +43,17 @@ async def get_song_info_from_platform(platform: str, song_id: str) -> dict | Non
         return None
 
     if platform == "melon":
-        import requests
-        from bs4 import BeautifulSoup
-        try:
-            res = requests.get(
-                f"https://www.melon.com/song/detail.htm?songId={song_id}",
-                headers={
-                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-                    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-                    "Accept-Language": "ko-KR,ko;q=0.9",
-                    "Referer": "https://www.melon.com",
-                },
-            timeout=5
-)
-            print(f"[Melon] status: {res.status_code}")
-            doc = BeautifulSoup(res.text, "html.parser")
-            title  = doc.select_one("div.song_name strong")
-            artist = doc.select_one("div.artist_name span.ellipsis")
-            album  = doc.select_one("div.song_info dl dd.ellipsis")
-            art    = doc.select_one("div.thumb img")
-            print(f"[Melon] title: {title}, artist: {artist}")
-            if title and artist:
-                return {
-                    "title":    title.text.strip(),
-                    "artist":   artist.text.strip(),
-                    "album":    album.text.strip() if album else None,
-                    "albumArt": art.get("src") if art else None,
-                }
-        except Exception as e:
-            print(f"[Parse] Melon 크롤링 실패: {e}")
+        from services.melon import get_melon_info_by_id
+        print(f"[Melon] get_melon_info_by_id 호출: {song_id}")  # ← 추가
+        info = get_melon_info_by_id(song_id)
+        if info:
+            itunes = await search_itunes(info["title"], info["artist"])
+            return {
+                "title":    info["title"],
+                "artist":   info["artist"],
+                "album":    info["album"],
+                "albumArt": itunes["albumArt"] if itunes else None,
+            }
         return None
 
     if platform == "bugs":
