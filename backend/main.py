@@ -1,10 +1,17 @@
+import logging
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+
 from routers import match, parse
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+)
 
 app = FastAPI(title="Musiknot API")
 
-# CORS 설정
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -16,7 +23,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# 라우터 등록
 app.include_router(match.router)
 app.include_router(parse.router)
 

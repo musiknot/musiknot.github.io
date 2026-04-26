@@ -1,8 +1,13 @@
-import requests
+import logging
 import re
+
+import httpx
 from bs4 import BeautifulSoup
-from difflib import SequenceMatcher
-from models.schemas import SongResult
+
+from core.scoring import calc_score
+from models.schemas import Platform, Track
+
+log = logging.getLogger(__name__)
 
 MELON_HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
@@ -14,36 +19,30 @@ MELON_HEADERS = {
     "Upgrade-Insecure-Requests": "1",
 }
 
-def similarity(a: str, b: str) -> float:
-    return SequenceMatcher(None, a.lower().strip(), b.lower().strip()).ratio()
+SEARCH_URL = "https://www.melon.com/search/song/index.htm"
+DETAIL_URL = "https://www.melon.com/song/detail.htm"
 
 
-def calc_score(inp_title: str, inp_artist: str,
-               res_title: str, res_artist: str) -> float:
-    t = similarity(inp_title,  res_title)
-    a = similarity(inp_artist, res_artist)
-    # 제목 60% + 아티스트 40% 가중 평균
-    return round(t * 0.6 + a * 0.4, 4)
-
-
-def search_melon(title: str, artist: str, limit: int = 5) -> list[SongResult]:
-    url = f'https://www.melon.com/search/song/index.htm?q={title}'
-
+async def search(title: str, artist: str, limit: int = 5) -> list[Track]:
     try:
-        res = requests.get(url, headers=MELON_HEADERS, timeout=5)
-        res.raise_for_status()
-    except requests.RequestException:
+        async with httpx.AsyncClient(headers=MELON_HEADERS, timeout=5) as client:
+            res = await client.get(SEARCH_URL, params={"q": title})
+            res.raise_for_status()
+    except httpx.HTTPError as e:
+        log.warning("Melon search failed: %s", e)
         return []
 
     doc = BeautifulSoup(res.text, "html.parser")
-    results = []
+    results: list[Track] = []
 
     for row in doc.select("tr"):
+        if len(results) >= limit:
+            break
+
         btn = row.select_one("button[data-song-no]")
         if not btn:
             continue
 
-        song_id   = btn.get("data-song-no")
         title_el  = row.select_one("a.fc_gray[title]")
         artist_el = row.select_one("a.fc_mgray")
         album_el  = row.find("a", href=re.compile(r"goAlbumDetail"))
@@ -53,144 +52,117 @@ def search_melon(title: str, artist: str, limit: int = 5) -> list[SongResult]:
 
         res_title  = title_el.text.strip()
         res_artist = artist_el.text.strip()
-        res_album  = album_el.text.strip() if album_el else None
 
-        print(f"[Melon] title.text='{res_title}' / title속성='{title_el.get('title')}'")
-
-        score = calc_score(title, artist, res_title, res_artist)
-
-        results.append(SongResult(
-            songId     = song_id,
+        results.append(Track(
+            platform   = Platform.MELON,
+            track_id   = btn.get("data-song-no"),
             title      = res_title,
             artist     = res_artist,
-            album      = res_album,
-            similarity = score
+            album      = album_el.text.strip() if album_el else None,
+            similarity = calc_score(title, artist, res_title, res_artist),
         ))
 
-        if len(results) >= limit:
-            break
-
-    return sorted(results, key=lambda x: x.similarity, reverse=True)
+    return sorted(results, key=lambda t: t.similarity or 0, reverse=True)
 
 
-def merge_results(a: list[SongResult],
-                  b: list[SongResult]) -> list[SongResult]:
-    seen, merged = set(), []
-    for r in sorted(a + b, key=lambda x: x.similarity, reverse=True):
-        if r.songId not in seen:
-            seen.add(r.songId)
-            merged.append(r)
-    return merged
+async def lookup_by_id(track_id: str) -> Track | None:
+    """곡 상세 페이지로 1차 시도, 실패 시 검색 페이지 폴백."""
+    async with httpx.AsyncClient(headers=MELON_HEADERS, timeout=10) as client:
+        # 메인 페이지를 먼저 방문해서 세션 쿠키 확보 (봇 탐지 우회)
+        try:
+            await client.get("https://www.melon.com")
+        except httpx.HTTPError:
+            pass
 
-def get_melon_info_by_id(song_id: str) -> dict | None:
-    """
-    멜론 songId로 곡 정보(제목, 아티스트, 앨범명, 앨범아트 URL)를 조회한다.
+        # 1차: 상세 페이지
+        track = await _lookup_via_detail(client, track_id)
+        if track:
+            return track
 
-    1차: 곡 상세 페이지(song/detail.htm)를 직접 호출 (정확도 100%, 봇 탐지 위험 낮음)
-    2차: 검색 페이지(search/song/index.htm)를 폴백으로 사용 (파라미터 완비)
-    """
+        # 2차: 검색 페이지에서 동일 songId 행 찾기
+        return await _lookup_via_search(client, track_id)
 
-    # ── 공통 세션 및 헤더 설정 ──────────────────────────────
-    session = requests.Session()
-    headers = {
-        **MELON_HEADERS,
-        "Referer": "https://www.melon.com/",
-    }
 
-    # 메인 페이지를 먼저 방문하여 세션 쿠키 확보 (봇 탐지 우회)
+async def _lookup_via_detail(client: httpx.AsyncClient, track_id: str) -> Track | None:
     try:
-        session.get("https://www.melon.com", headers=headers, timeout=5)
-    except requests.RequestException:
-        pass  # 쿠키 확보 실패해도 본 요청은 시도
-
-    # ── 1차 시도: 곡 상세 페이지 직접 접근 ──────────────────
-    detail_url = f"https://www.melon.com/song/detail.htm?songId={song_id}"
-    try:
-        res = session.get(detail_url, headers=headers, timeout=10)
+        res = await client.get(DETAIL_URL, params={"songId": track_id})
         res.raise_for_status()
-        print(f"[Melon][Detail] HTTP {res.status_code}, 길이={len(res.text)}")
-        print(f"[Melon][Detail] HTML 앞부분: {res.text[:300]}")
+    except httpx.HTTPError as e:
+        log.warning("Melon detail request failed: %s", e)
+        return None
 
-        doc = BeautifulSoup(res.text, "html.parser")
+    doc = BeautifulSoup(res.text, "html.parser")
 
-        # 곡 제목: <div class="song_name"> 안의 텍스트 (앞에 "곡명" 라벨 포함)
-        title_el  = doc.select_one("div.song_name")
-        artist_el = doc.select_one("div.artist a")
-        album_el  = doc.select_one("div.meta dd a")          # 첫 번째 dd > a 가 앨범명
-        img_el    = doc.select_one("div.thumb img")           # 앨범아트 이미지
+    title_el  = doc.select_one("div.song_name")
+    artist_el = doc.select_one("div.artist a")
+    album_el  = doc.select_one("div.meta dd a")
+    img_el    = doc.select_one("div.thumb img")
 
-        if title_el and artist_el:
-            title_text = title_el.get_text(strip=True)
-            # "곡명" 라벨이 포함되어 있을 수 있으므로 제거
-            title_text = title_text.replace("곡명", "").strip()
+    if not title_el or not artist_el:
+        log.info("Melon detail parse miss for id=%s, falling back to search", track_id)
+        return None
 
-            result = {
-                "title":     title_text,
-                "artist":    artist_el.get_text(strip=True),
-                "album":     album_el.get_text(strip=True) if album_el else None,
-                "image_url": img_el["src"] if img_el and img_el.get("src") else None,
-            }
-            print(f"[Melon][Detail] 파싱 성공: {result}")
-            return result
+    title_text = title_el.get_text(strip=True).replace("곡명", "").strip()
 
-        print("[Melon][Detail] 상세 페이지 파싱 실패, 검색 폴백으로 전환")
+    return Track(
+        platform  = Platform.MELON,
+        track_id  = track_id,
+        title     = title_text,
+        artist    = artist_el.get_text(strip=True),
+        album     = album_el.get_text(strip=True) if album_el else None,
+        album_art = img_el["src"] if img_el and img_el.get("src") else None,
+    )
 
-    except requests.RequestException as e:
-        print(f"[Melon][Detail] 요청 실패: {e}, 검색 폴백으로 전환")
 
-    # ── 2차 시도: 검색 페이지 폴백 (파라미터 완비) ───────────
-    search_url = "https://www.melon.com/search/song/index.htm"
-    search_params = {
-        "q":            song_id,
-        "section":      "",
-        "searchGnbYn":  "Y",
-        "kkoSpl":       "Y",
-        "kkoDpType":    "",
-        "mwkLogType":   "T",
-    }
-
+async def _lookup_via_search(client: httpx.AsyncClient, track_id: str) -> Track | None:
     try:
-        res = session.get(
-            search_url, params=search_params, headers=headers, timeout=10
+        res = await client.get(SEARCH_URL, params={
+            "q":           track_id,
+            "section":     "",
+            "searchGnbYn": "Y",
+            "kkoSpl":      "Y",
+            "kkoDpType":   "",
+            "mwkLogType":  "T",
+        })
+        res.raise_for_status()
+    except httpx.HTTPError as e:
+        log.warning("Melon search-fallback failed: %s", e)
+        return None
+
+    doc = BeautifulSoup(res.text, "html.parser")
+
+    for row in doc.select("table tbody tr"):
+        btn = row.select_one("button[data-song-no]")
+        if not btn or btn.get("data-song-no") != str(track_id):
+            continue
+
+        title_el  = row.select_one("a.fc_gray")
+        artist_el = row.select_one("div.ellipsis.rank02 a")
+        album_el  = row.select_one("div.ellipsis.rank03 a")
+        img_el    = row.select_one("img")
+
+        if not title_el:
+            continue
+
+        return Track(
+            platform  = Platform.MELON,
+            track_id  = track_id,
+            title     = title_el.get_text(strip=True),
+            artist    = artist_el.get_text(strip=True) if artist_el else "",
+            album     = album_el.get_text(strip=True) if album_el else None,
+            album_art = img_el["src"] if img_el and img_el.get("src") else None,
         )
-        res.raise_for_status()
-        print(f"[Melon][Search] HTTP {res.status_code}, 길이={len(res.text)}")
-        print(f"[Melon][Search] HTML 앞부분: {res.text[:300]}")
 
-        doc = BeautifulSoup(res.text, "html.parser")
-
-        # 검색 결과 테이블의 각 행을 순회하며 songId 일치 항목을 찾는다
-        for row in doc.select("table tbody tr"):
-            btn = row.select_one("button[data-song-no]")
-            if not btn:
-                continue
-            if btn["data-song-no"] != str(song_id):
-                continue
-
-            # 곡 제목
-            title_el = row.select_one("a.fc_gray")
-            # 아티스트
-            artist_el = row.select_one("div.ellipsis.rank02 a")
-            # 앨범명
-            album_el = row.select_one("div.ellipsis.rank03 a")
-            # 앨범아트
-            img_el = row.select_one("img")
-
-            if not title_el:
-                continue
-
-            result = {
-                "title":     title_el.get_text(strip=True),
-                "artist":    artist_el.get_text(strip=True) if artist_el else None,
-                "album":     album_el.get_text(strip=True) if album_el else None,
-                "image_url": img_el["src"] if img_el and img_el.get("src") else None,
-            }
-            print(f"[Melon][Search] 파싱 성공: {result}")
-            return result
-
-        print("[Melon][Search] 검색 결과에서 일치하는 songId를 찾지 못함")
-
-    except requests.RequestException as e:
-        print(f"[Melon][Search] 요청 실패: {e}")
-
+    log.info("Melon search-fallback found no match for id=%s", track_id)
     return None
+
+
+def merge_results(a: list[Track], b: list[Track]) -> list[Track]:
+    """track_id 중복 제거 후 similarity 내림차순 정렬."""
+    seen: set[str]      = set()
+    merged: list[Track] = []
+    for t in sorted(a + b, key=lambda x: x.similarity or 0, reverse=True):
+        if t.track_id not in seen:
+            seen.add(t.track_id)
+            merged.append(t)
+    return merged

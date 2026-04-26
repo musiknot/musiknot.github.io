@@ -1,88 +1,82 @@
+import logging
+
 import httpx
-from difflib import SequenceMatcher
+
+from core.scoring import SEARCH_MATCH_THRESHOLD, calc_score
+from models.schemas import Platform, Track
+
+log = logging.getLogger(__name__)
+
+SEARCH_URL = "https://itunes.apple.com/search"
+LOOKUP_URL = "https://itunes.apple.com/lookup"
+
+# 변형 버전(라이브/리믹스/MR) 제외용 토큰
+_VARIANT_TOKENS = ("(Live)", "(Remix)", "(Inst.", "(MR)", "(Cover")
 
 
-def similarity(a: str, b: str) -> float:
-    return SequenceMatcher(None, a.lower().strip(), b.lower().strip()).ratio()
+def _to_track(track: dict, similarity: float | None = None) -> Track:
+    artwork = track.get("artworkUrl100", "").replace("100x100bb", "600x600bb") or None
+    return Track(
+        platform   = Platform.APPLE_MUSIC,
+        track_id   = str(track.get("trackId", "")),
+        title      = track.get("trackName", ""),
+        artist     = track.get("artistName", ""),
+        album      = track.get("collectionName"),
+        album_art  = artwork,
+        similarity = similarity,
+    )
 
 
-async def search_itunes(title: str, artist: str, limit: int = 5) -> dict | None:
-    """
-    iTunes Search API로 곡 정보 조회.
-    반환: {
-        "appleMusic_id": "1499378607",
-        "title":         "Blinding Lights",
-        "artist":        "The Weeknd",
-        "album":         "After Hours",
-        "albumArt":      "https://is1-ssl.mzstatic.com/.../600x600bb.jpg",
-    }
-    """
+async def search(title: str, artist: str, limit: int = 5) -> list[Track]:
+    """단일 best 매치를 list로 감싸 반환 (호출부 인터페이스 통일)."""
     try:
         async with httpx.AsyncClient(timeout=5) as client:
-            res = await client.get(
-                "https://itunes.apple.com/search",
-                params={
-                    "term":   f"{title} {artist}",
-                    "media":  "music",
-                    "entity": "song",
-                    "limit":  limit
-                }
-            )
+            res = await client.get(SEARCH_URL, params={
+                "term":   f"{title} {artist}",
+                "media":  "music",
+                "entity": "song",
+                "limit":  limit,
+            })
             res.raise_for_status()
             results = res.json().get("results", [])
-    except Exception as e:
-        print(f"[iTunes] 요청 실패: {e}")
-        return None
+    except httpx.HTTPError as e:
+        log.warning("iTunes search failed: %s", e)
+        return []
 
-    if not results:
-        return None
-
-    # 제목 + 아티스트 유사도로 가장 일치하는 곡 선택
-    best       = None
-    best_score = 0.0
+    best: dict | None = None
+    best_score        = 0.0
 
     for track in results:
-        # (Live), (Remix), (Inst.) 등 변형 버전 제외
         track_name = track.get("trackName", "")
-        if any(x in track_name for x in ["(Live)", "(Remix)", "(Inst.", "(MR)", "(Cover"]):
+        if any(x in track_name for x in _VARIANT_TOKENS):
             continue
 
-        title_score  = similarity(title,  track_name)
-        artist_score = similarity(artist, track.get("artistName", ""))
-        score = title_score * 0.6 + artist_score * 0.4
-
-        # 싱글 버전 우선 보너스
-        collection = track.get("collectionName", "")
-        if "Single" in collection:
+        score = calc_score(title, artist, track_name, track.get("artistName", ""))
+        # 싱글 우선 보너스
+        if "Single" in track.get("collectionName", ""):
             score += 0.05
 
         if score > best_score:
             best_score = score
             best       = track
 
-    if not best or best_score < 0.5:
-        print(f"[iTunes] 유사도 낮음: {best_score}")
+    if not best or best_score < SEARCH_MATCH_THRESHOLD:
+        log.info("iTunes match below threshold (best=%.3f)", best_score)
+        return []
+
+    return [_to_track(best, similarity=best_score)]
+
+
+async def lookup_by_id(track_id: str) -> Track | None:
+    try:
+        async with httpx.AsyncClient(timeout=5) as client:
+            res = await client.get(LOOKUP_URL, params={"id": track_id, "media": "music"})
+            res.raise_for_status()
+            results = res.json().get("results", [])
+    except httpx.HTTPError as e:
+        log.warning("iTunes lookup failed: %s", e)
         return None
 
-    # 앨범아트 고화질로 변환 (100x100 → 600x600)
-    artwork = best.get("artworkUrl100", "")
-    artwork = artwork.replace("100x100bb", "600x600bb")
-
-    # Apple Music trackId 추출
-    apple_id = str(best.get("trackId", ""))
-
-    print(f"[iTunes] 매칭: {best.get('trackName')} / {best.get('artistName')} (score={best_score:.4f})")
-
-    return {
-        "appleMusic_id": apple_id,
-        "title":         best.get("trackName", ""),
-        "artist":        best.get("artistName", ""),
-        "album":         best.get("collectionName", ""),
-        "albumArt":      artwork,
-    }
-
-
-async def get_apple_music_id(title: str, artist: str) -> str | None:
-    """Apple Music ID만 필요할 때 사용."""
-    result = await search_itunes(title, artist)
-    return result["appleMusic_id"] if result else None
+    if not results:
+        return None
+    return _to_track(results[0])

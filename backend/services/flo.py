@@ -1,5 +1,11 @@
+import logging
+
 import httpx
-from difflib import SequenceMatcher
+
+from core.scoring import calc_score
+from models.schemas import Platform, Track
+
+log = logging.getLogger(__name__)
 
 FLO_HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:149.0) Gecko/20100101 Firefox/149.0",
@@ -13,64 +19,73 @@ FLO_HEADERS = {
     "x-gm-access-token": "",
 }
 
-
-def similarity(a: str, b: str) -> float:
-    return SequenceMatcher(None, a.lower().strip(), b.lower().strip()).ratio()
-
-
-def calc_score(inp_title: str, inp_artist: str,
-               res_title: str, res_artist: str) -> float:
-    t = similarity(inp_title,  res_title)
-    a = similarity(inp_artist, res_artist)
-    return round(t * 0.6 + a * 0.4, 4)
+SEARCH_URL = "https://www.music-flo.com/api/search/v2/search/integration"
+LOOKUP_URL = "https://www.music-flo.com/api/meta/v1/track"
 
 
-async def search_flo(title: str, artist: str, limit: int = 5) -> str | None:
-    """
-    FLO 내부 API로 track ID 반환.
-    반환: "438092629" 또는 None
-    """
+async def search(title: str, artist: str, limit: int = 5) -> list[Track]:
     try:
-        async with httpx.AsyncClient(timeout=5, headers=FLO_HEADERS) as client:
-            res = await client.get(
-                "https://www.music-flo.com/api/search/v2/search/integration",
-                params={"keyword": f"{title} {artist}"}
-            )
+        async with httpx.AsyncClient(headers=FLO_HEADERS, timeout=5) as client:
+            res = await client.get(SEARCH_URL, params={"keyword": f"{title} {artist}"})
             res.raise_for_status()
             data = res.json()
-    except Exception as e:
-        print(f"[FLO] 요청 실패: {e}")
-        return None
+    except httpx.HTTPError as e:
+        log.warning("FLO search failed: %s", e)
+        return []
 
-    # TRACK + TITLED 리스트 추출
+    # TRACK + TITLED 섹션에서 곡 리스트 추출
     track_list = []
     for section in data.get("data", {}).get("list", []):
         if section.get("type") == "TRACK" and section.get("style") == "TITLED":
             track_list = section.get("list", [])
             break
 
-    if not track_list:
-        print("[FLO] 검색 결과 없음")
-        return None
-
-    best_id    = None
-    best_score = 0.0
-
+    results: list[Track] = []
     for track in track_list[:limit]:
         track_id   = str(track.get("id", ""))
+        if not track_id:
+            continue
         res_title  = track.get("name", "")
         res_artist = track.get("representationArtist", {}).get("name", "")
 
-        score = calc_score(title, artist, res_title, res_artist)
-        print(f"[FLO] {res_title} / {res_artist} → score={score}")
+        img_list = track.get("album", {}).get("imgList", [])
+        artwork  = next((i["url"] for i in img_list if i.get("size") == 500), None)
 
-        if score > best_score:
-            best_score = score
-            best_id    = track_id
+        results.append(Track(
+            platform   = Platform.FLO,
+            track_id   = track_id,
+            title      = res_title,
+            artist     = res_artist,
+            album      = track.get("album", {}).get("title"),
+            album_art  = artwork,
+            similarity = calc_score(title, artist, res_title, res_artist),
+        ))
 
-    if not best_id or best_score < 0.5:
-        print(f"[FLO] 매칭 실패: best_score={best_score}")
+    return sorted(results, key=lambda t: t.similarity or 0, reverse=True)
+
+
+async def lookup_by_id(track_id: str) -> Track | None:
+    try:
+        async with httpx.AsyncClient(headers=FLO_HEADERS, timeout=5) as client:
+            res = await client.get(f"{LOOKUP_URL}/{track_id}")
+            res.raise_for_status()
+            data = res.json().get("data", {})
+    except httpx.HTTPError as e:
+        log.warning("FLO lookup failed: %s", e)
         return None
 
-    print(f"[FLO] 최종 매칭: trackId={best_id} (score={best_score})")
-    return best_id
+    if not data:
+        return None
+
+    img_list = data.get("album", {}).get("imgList", [])
+    artwork  = next((i["url"] for i in img_list if i.get("size") == 500), None)
+    artists  = ", ".join(a["name"] for a in data.get("artistList", []))
+
+    return Track(
+        platform  = Platform.FLO,
+        track_id  = track_id,
+        title     = data.get("name", ""),
+        artist    = artists,
+        album     = data.get("album", {}).get("title"),
+        album_art = artwork,
+    )

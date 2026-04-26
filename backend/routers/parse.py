@@ -1,236 +1,122 @@
-import sys
-import os
 import asyncio
-from fastapi import APIRouter, HTTPException
-from models.schemas import ParseRequest, ParseResponse, PlatformIds
-from utils.url_resolver import resolve_url, extract_platform_id
-from services.itunes import search_itunes
-from services.melon import search_melon
-from services.bugs import search_bugs
-from services.flo import search_flo
-from services.youtube import search_youtube_mv, search_youtube_music
-from services.musicbrainz import get_english_candidates
+import logging
 
+from fastapi import APIRouter, HTTPException
+
+from core.scoring import SEARCH_MATCH_THRESHOLD
+from models.schemas import (
+    ParseRequest,
+    ParseResponse,
+    Platform,
+    PlatformIds,
+    Track,
+)
+from services import bugs, flo, itunes, melon, musicbrainz, url_resolver, youtube
+from utils.platform_url import extract_platform_id
+
+log    = logging.getLogger(__name__)
 router = APIRouter()
 
 
-async def get_song_info_from_platform(platform: str, song_id: str) -> dict | None:
+# 플랫폼 → 게이트웨이 lookup_by_id 라우팅
+_LOOKUP_BY_PLATFORM = {
+    Platform.APPLE_MUSIC:   itunes.lookup_by_id,
+    Platform.MELON:         melon.lookup_by_id,
+    Platform.BUGS:          bugs.lookup_by_id,
+    Platform.FLO:           flo.lookup_by_id,
+    Platform.YOUTUBE:       youtube.lookup_by_id,
+    Platform.YOUTUBE_MUSIC: youtube.lookup_by_id,
+}
+
+
+async def _resolve_english_query(title: str, artist: str) -> tuple[str, str]:
     """
-    플랫폼 + ID로 곡 정보 조회.
-    반환: { "title", "artist", "album", "albumArt" }
+    외국 플랫폼 검색용 영문 질의어 결정.
+    - 이미 ASCII면 그대로 사용
+    - MusicBrainz가 영문 후보를 주면 첫 번째 사용
+    - 둘 다 안 되면 원본 그대로 fallback (영어 후보 없을 때 검색이 아예 안 도는 것보단 낫다)
     """
-
-    if platform == "appleMusic":
-        import httpx
-        try:
-            async with httpx.AsyncClient(timeout=5) as client:
-                res = await client.get(
-                    "https://itunes.apple.com/lookup",
-                    params={"id": song_id, "media": "music"}
-                )
-                data = res.json().get("results", [])
-                if data:
-                    track = data[0]
-                    artwork = track.get("artworkUrl100", "").replace("100x100bb", "600x600bb")
-                    return {
-                        "title":    track.get("trackName", ""),
-                        "artist":   track.get("artistName", ""),
-                        "album":    track.get("collectionName", ""),
-                        "albumArt": artwork,
-                    }
-        except Exception as e:
-            print(f"[Parse] iTunes lookup 실패: {e}")
-        return None
-
-    if platform == "melon":
-        from services.melon import get_melon_info_by_id
-        print(f"[Melon] get_melon_info_by_id 호출: {song_id}")  # ← 추가
-        info = get_melon_info_by_id(song_id)
-        if info:
-            itunes = await search_itunes(info["title"], info["artist"])
-            return {
-                "title":    info["title"],
-                "artist":   info["artist"],
-                "album":    info["album"],
-                "albumArt": itunes["albumArt"] if itunes else None,
-            }
-        return None
-
-    if platform == "bugs":
-        import requests
-        from bs4 import BeautifulSoup
-        try:
-            res = requests.get(
-                f"https://music.bugs.co.kr/track/{song_id}",
-                headers={"User-Agent": "Mozilla/5.0"},
-                timeout=5
-            )
-            doc = BeautifulSoup(res.text, "html.parser")
-            title  = doc.select_one("h1.title")
-            artist = doc.select_one("p.artist a")
-            album  = doc.select_one("a.album")
-            art    = doc.select_one("div.thumbnail img")
-            if title and artist:
-                return {
-                    "title":    title.text.strip(),
-                    "artist":   artist.text.strip(),
-                    "album":    album.text.strip() if album else None,
-                    "albumArt": art.get("src") if art else None,
-                }
-        except Exception as e:
-            print(f"[Parse] Bugs 크롤링 실패: {e}")
-        return None
-
-    if platform == "flo":
-        import httpx
-        try:
-            async with httpx.AsyncClient(timeout=5) as client:
-                res = await client.get(
-                    f"https://www.music-flo.com/api/meta/v1/track/{song_id}",
-                    headers={
-                        "User-Agent": "Mozilla/5.0",
-                        "x-gm-os-type": "WEB",
-                        "x-gm-app-name": "FLO_WEB",
-                        "x-gm-app-version": "8.1.0",
-                        "x-gm-access-token": "",
-                    }
-                )
-                data = res.json().get("data", {})
-                if data:
-                    img_list = data.get("album", {}).get("imgList", [])
-                    artwork  = next((i["url"] for i in img_list if i["size"] == 500), None)
-                    # 아티스트 여러 명이면 쉼표로 연결
-                    artists  = ", ".join([a["name"] for a in data.get("artistList", [])])
-                    return {
-                        "title":    data.get("name", ""),
-                        "artist":   artists,
-                        "album":    data.get("album", {}).get("title", ""),
-                        "albumArt": artwork,
-                    }
-        except Exception as e:
-            print(f"[Parse] FLO API 실패: {e}")
-        return None
-    
-    if platform in ("youtube", "youtubeMusic"):
-        import httpx
-        try:
-            async with httpx.AsyncClient(timeout=5) as client:
-                res = await client.get(
-                    "https://www.googleapis.com/youtube/v3/videos",
-                    params={
-                        "part": "snippet",
-                        "id":   song_id,
-                        "key":  os.getenv("YOUTUBE_API_KEY"),
-                    }
-                )
-                items = res.json().get("items", [])
-                if items:
-                    snippet    = items[0]["snippet"]
-                    title      = snippet.get("title", "")
-                    channel    = snippet.get("channelTitle", "")
-                    # "The Weeknd - Blinding Lights (Official Video)" 형식에서 파싱
-                    if " - " in title:
-                        artist, song = title.split(" - ", 1)
-                        # "(Official Video)" 등 제거
-                        import re
-                        song = re.sub(r'\s*[\(\[].*?[\)\]]', '', song).strip()
-                    else:
-                        artist = channel
-                        song   = title
-                    return {
-                        "title":    song,
-                        "artist":   artist,
-                        "album":    None,
-                        "albumArt": None,
-                    }
-        except Exception as e:
-            print(f"[Parse] YouTube 곡 정보 실패: {e}")
-    return None
-
-    return None
-
-
-async def get_all_platform_ids(title: str, artist: str,
-                               known_platform: str, known_id: str) -> PlatformIds:
-    ids = {
-        "spotify":      None,
-        "appleMusic":   None,
-        "youtube":      None,
-        "youtubeMusic": None,
-        "melon":        None,
-        "bugs":         None,
-        "flo":          None,
-        "amazon":       None,
-    }
-    ids[known_platform] = known_id
-
-# 이미 ASCII(영어)면 MusicBrainz 스킵
     if title.isascii() and artist.isascii():
-        en_title  = title
-        en_artist = artist
-        print(f"[Parse] 영어 곡 → MusicBrainz 스킵")
-    else:
-        candidates = get_english_candidates(title, artist)
-        if candidates:
-            en_title  = candidates[0]["english_title"]
-            en_artist = candidates[0]["english_artist"]
-            print(f"[Parse] 영어 제목 변환: {title} → {en_title}")
+        return title, artist
+
+    candidates = await musicbrainz.get_english_candidates(title, artist)
+    if candidates:
+        return candidates[0]["english_title"], candidates[0]["english_artist"]
+
+    log.info("No English candidates from MusicBrainz; using original title/artist")
+    return title, artist
+
+
+async def _enrich_track(track: Track) -> Track:
+    """원본 플랫폼이 album/album_art를 못 채웠으면 iTunes로 보강."""
+    if track.album and track.album_art:
+        return track
+
+    itunes_results = await itunes.search(track.title, track.artist)
+    if not itunes_results:
+        return track
+
+    fill = itunes_results[0]
+    return track.model_copy(update={
+        "album":     track.album     or fill.album,
+        "album_art": track.album_art or fill.album_art,
+    })
+
+
+async def _find_cross_platform_ids(
+    title: str, artist: str, known_platform: Platform, known_id: str,
+) -> PlatformIds:
+    en_title, en_artist = await _resolve_english_query(title, artist)
+
+    ids: dict[str, str | None] = {p.value: None for p in Platform}
+    ids[known_platform.value]  = known_id
 
     async def fetch_apple():
-        if ids["appleMusic"]:
+        if ids[Platform.APPLE_MUSIC.value]:
             return
-        result = await search_itunes(en_title, en_artist)
-        if result:
-            ids["appleMusic"] = result["appleMusic_id"]
-            print(f"[Parse] Apple Music ID: {ids['appleMusic']}")
+        results = await itunes.search(en_title, en_artist)
+        if results:
+            ids[Platform.APPLE_MUSIC.value] = results[0].track_id
 
     async def fetch_melon():
-        if ids["melon"]:
+        if ids[Platform.MELON.value]:
             return
-        results = await asyncio.to_thread(search_melon, en_title, en_artist)
-        if results and results[0].similarity >= 0.5:
-            ids["melon"] = results[0].songId
-            print(f"[Parse] Melon ID: {ids['melon']}")
+        results = await melon.search(en_title, en_artist)
+        if results and (results[0].similarity or 0) >= SEARCH_MATCH_THRESHOLD:
+            ids[Platform.MELON.value] = results[0].track_id
 
     async def fetch_bugs():
-        if ids["bugs"]:
+        if ids[Platform.BUGS.value]:
             return
-        bug_id = await asyncio.to_thread(search_bugs, en_title, en_artist)
-        if bug_id:
-            ids["bugs"] = bug_id
-            print(f"[Parse] Bugs ID: {ids['bugs']}")
+        results = await bugs.search(en_title, en_artist)
+        if results and (results[0].similarity or 0) >= SEARCH_MATCH_THRESHOLD:
+            ids[Platform.BUGS.value] = results[0].track_id
 
     async def fetch_flo():
-        if ids["flo"]:
+        if ids[Platform.FLO.value]:
             return
-        flo_id = await search_flo(en_title, en_artist)
-        if flo_id:
-            ids["flo"] = flo_id
-            print(f"[Parse] FLO ID: {ids['flo']}")
+        results = await flo.search(en_title, en_artist)
+        if results and (results[0].similarity or 0) >= SEARCH_MATCH_THRESHOLD:
+            ids[Platform.FLO.value] = results[0].track_id
 
     async def fetch_youtube():
-        # STEP 1: MV 검색
-        mv_id = await search_youtube_mv(en_title, en_artist)
-        if mv_id:
-            ids["youtube"] = mv_id
-            print(f"[Parse] YouTube MV ID: {mv_id}")
+        # MV 우선
+        if not ids[Platform.YOUTUBE.value]:
+            mv = await youtube.search_mv(en_title, en_artist)
+            if mv:
+                ids[Platform.YOUTUBE.value] = mv.track_id
 
-        # STEP 2: Topic 채널 음원 검색
-        music_id = await search_youtube_music(en_title, en_artist)
-        if music_id:
-            ids["youtubeMusic"] = music_id
-            print(f"[Parse] YouTube Music ID: {music_id}")
-        elif mv_id:
-            # Topic 채널 없으면 MV ID로 fallback
-            ids["youtubeMusic"] = mv_id
-            print(f"[Parse] YouTube Music ID: MV fallback → {mv_id}")
+        # Topic 채널 음원
+        if not ids[Platform.YOUTUBE_MUSIC.value]:
+            topic = await youtube.search_topic(en_title, en_artist)
+            if topic:
+                ids[Platform.YOUTUBE_MUSIC.value] = topic.track_id
+            elif ids[Platform.YOUTUBE.value]:
+                # Topic 없으면 MV로 fallback
+                ids[Platform.YOUTUBE_MUSIC.value] = ids[Platform.YOUTUBE.value]
 
     await asyncio.gather(
-        fetch_apple(),
-        fetch_melon(),
-        fetch_bugs(),
-        fetch_flo(),
-        fetch_youtube(),
+        fetch_apple(), fetch_melon(), fetch_bugs(), fetch_flo(), fetch_youtube(),
     )
 
     return PlatformIds(**ids)
@@ -238,55 +124,45 @@ async def get_all_platform_ids(title: str, artist: str,
 
 @router.post("/parse", response_model=ParseResponse)
 async def parse_url(req: ParseRequest):
-
     url = req.url
 
-    # STEP 1: 단축 URL 처리
+    # STEP 1: 단축 URL 해제
     if "kko.to" in url or "flomuz.io" in url:
         try:
-            url = await resolve_url(url)
-            print(f"[Parse] 단축 URL 해제: {url}")
+            url = await url_resolver.resolve_url(url)
+            log.info("Short URL resolved → %s", url)
         except ValueError as e:
             raise HTTPException(status_code=400, detail=str(e))
 
-    # STEP 2: 플랫폼 감지 + ID 추출
+    # STEP 2: 플랫폼 감지
     parsed = extract_platform_id(url)
     if not parsed:
         raise HTTPException(status_code=400, detail="지원하지 않는 플랫폼입니다.")
-
-    platform = parsed["platform"]
-    song_id  = parsed["id"]
-    print(f"[Parse] platform={platform}, id={song_id}")
+    platform, track_id = parsed
+    log.info("Detected platform=%s, id=%s", platform.value, track_id)
 
     # STEP 3: 해당 플랫폼에서 곡 정보 조회
-    song_info = await get_song_info_from_platform(platform, song_id)
-    if not song_info:
+    lookup = _LOOKUP_BY_PLATFORM.get(platform)
+    if lookup is None:
+        raise HTTPException(status_code=501, detail=f"플랫폼 lookup 미구현: {platform.value}")
+
+    track = await lookup(track_id)
+    if not track:
         raise HTTPException(status_code=404, detail="곡 정보를 찾을 수 없습니다.")
 
-    title    = song_info["title"]
-    artist   = song_info["artist"]
-    album    = song_info["album"]
-    albumArt = song_info["albumArt"]
+    # STEP 4: album/album_art 누락 시 iTunes로 보강
+    track = await _enrich_track(track)
 
-    print(f"[Parse] 곡 정보: {title} / {artist}")
-
-    # STEP 4: 나머지 플랫폼 ID 조회
-    platform_ids = await get_all_platform_ids(title, artist, platform, song_id)
-
-    # Apple Music 결과에서 albumArt, album 업그레이드
-    if not albumArt or not album:
-        result = await search_itunes(title, artist)
-        if result:
-            if not albumArt:
-                albumArt = result["albumArt"]
-            if not album:
-                album = result["album"]
+    # STEP 5: 나머지 플랫폼 ID 병렬 조회
+    platform_ids = await _find_cross_platform_ids(
+        track.title, track.artist, platform, track_id,
+    )
 
     return ParseResponse(
-        title     = title,
-        artist    = artist,
-        album     = album,
-        albumArt  = albumArt,
+        title     = track.title,
+        artist    = track.artist,
+        album     = track.album,
+        albumArt  = track.album_art,
         isrc      = None,
         platforms = platform_ids,
     )
