@@ -11,7 +11,7 @@ from models.schemas import (
     PlatformIds,
     Track,
 )
-from services import bugs, flo, itunes, melon, musicbrainz, url_resolver, youtube
+from services import bugs, flo, itunes, melon, url_resolver, youtube
 from utils.platform_url import extract_platform_id
 
 log    = logging.getLogger(__name__)
@@ -27,24 +27,6 @@ _LOOKUP_BY_PLATFORM = {
     Platform.YOUTUBE:       youtube.lookup_by_id,
     Platform.YOUTUBE_MUSIC: youtube.lookup_by_id,
 }
-
-
-async def _resolve_english_query(title: str, artist: str) -> tuple[str, str]:
-    """
-    외국 플랫폼 검색용 영문 질의어 결정.
-    - 이미 ASCII면 그대로 사용
-    - MusicBrainz가 영문 후보를 주면 첫 번째 사용
-    - 둘 다 안 되면 원본 그대로 fallback (영어 후보 없을 때 검색이 아예 안 도는 것보단 낫다)
-    """
-    if title.isascii() and artist.isascii():
-        return title, artist
-
-    candidates = await musicbrainz.get_english_candidates(title, artist)
-    if candidates:
-        return candidates[0]["english_title"], candidates[0]["english_artist"]
-
-    log.info("No English candidates from MusicBrainz; using original title/artist")
-    return title, artist
 
 
 async def _enrich_track(track: Track) -> Track:
@@ -66,49 +48,58 @@ async def _enrich_track(track: Track) -> Track:
 async def _find_cross_platform_ids(
     title: str, artist: str, known_platform: Platform, known_id: str,
 ) -> PlatformIds:
-    en_title, en_artist = await _resolve_english_query(title, artist)
+    """모든 플랫폼에 **원문 그대로** 질의한다.
 
+    예전에는 여기서 MusicBrainz로 영문 질의어를 만들어 돌려썼는데, 그게 두 가지를
+    한꺼번에 망가뜨리고 있었다.
+      1) 멜론/벅스/FLO는 원제만 색인한다. 번역어를 넣으면 '밤편지'(정답,
+         sim 1.0) 대신 'Through the Night'로 검색해 sim 0.54짜리 엉뚱한 곡이
+         임계값을 통과했다.
+      2) iTunes 쪽은 번역이 필요 없다. itunes.search()가 문자체계에 맞는
+         스토어프론트를 골라 원문 표기 그대로 받아온다.
+    번역어는 이제 어디에도 필요하지 않다.
+    """
     ids: dict[str, str | None] = {p.value: None for p in Platform}
     ids[known_platform.value]  = known_id
 
     async def fetch_apple():
         if ids[Platform.APPLE_MUSIC.value]:
             return
-        results = await itunes.search(en_title, en_artist)
+        results = await itunes.search(title, artist)
         if results:
             ids[Platform.APPLE_MUSIC.value] = results[0].track_id
 
     async def fetch_melon():
         if ids[Platform.MELON.value]:
             return
-        results = await melon.search(en_title, en_artist)
+        results = await melon.search(title, artist)
         if results and (results[0].similarity or 0) >= SEARCH_MATCH_THRESHOLD:
             ids[Platform.MELON.value] = results[0].track_id
 
     async def fetch_bugs():
         if ids[Platform.BUGS.value]:
             return
-        results = await bugs.search(en_title, en_artist)
+        results = await bugs.search(title, artist)
         if results and (results[0].similarity or 0) >= SEARCH_MATCH_THRESHOLD:
             ids[Platform.BUGS.value] = results[0].track_id
 
     async def fetch_flo():
         if ids[Platform.FLO.value]:
             return
-        results = await flo.search(en_title, en_artist)
+        results = await flo.search(title, artist)
         if results and (results[0].similarity or 0) >= SEARCH_MATCH_THRESHOLD:
             ids[Platform.FLO.value] = results[0].track_id
 
     async def fetch_youtube():
         # MV 우선
         if not ids[Platform.YOUTUBE.value]:
-            mv = await youtube.search_mv(en_title, en_artist)
+            mv = await youtube.search_mv(title, artist)
             if mv:
                 ids[Platform.YOUTUBE.value] = mv.track_id
 
         # Topic 채널 음원
         if not ids[Platform.YOUTUBE_MUSIC.value]:
-            topic = await youtube.search_topic(en_title, en_artist)
+            topic = await youtube.search_topic(title, artist)
             if topic:
                 ids[Platform.YOUTUBE_MUSIC.value] = topic.track_id
             elif ids[Platform.YOUTUBE.value]:
@@ -153,7 +144,7 @@ async def parse_url(req: ParseRequest):
     # STEP 4: album/album_art 누락 시 iTunes로 보강
     track = await _enrich_track(track)
 
-    # STEP 5: 나머지 플랫폼 ID 병렬 조회
+    # STEP 5: 나머지 플랫폼 ID 병렬 조회 (원문 질의)
     platform_ids = await _find_cross_platform_ids(
         track.title, track.artist, platform, track_id,
     )
