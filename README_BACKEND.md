@@ -42,8 +42,9 @@ backend/
 │   └── schemas.py            # Pydantic 스키마 (도메인 + I/O)
 │
 ├── routers/
-│   ├── parse.py              # POST /parse — URL → 멀티플랫폼 ID
-│   └── match.py              # POST /match — 제목·아티스트 → 멜론 검색
+│   ├── parse.py              # POST /parse — URL 또는 공유 ID → 멀티플랫폼 ID
+│   ├── match.py              # POST /match — 제목·아티스트 → 멜론 검색
+│   └── share.py              # GET /s/{id} — 크롤러용 OG 카드 (3xx 없음)
 │
 ├── services/                 # 외부 API/스크래퍼 어댑터 (전부 async)
 │   ├── url_resolver.py       # 단축 URL 해제
@@ -54,11 +55,13 @@ backend/
 │   └── youtube.py            # YouTube Data API v3
 │
 ├── utils/
-│   └── platform_url.py       # 정규식 → (Platform, track_id)
+│   └── platform_url.py       # 정규식 → (Platform, track_id) + 공유 ID 빌드/파싱
 │
-└── tests/                    # pytest. 네트워크 없이 0.2초 (tests/README.md 참고)
+└── tests/                    # pytest 98개. 네트워크 없이 0.2초 (tests/README.md 참고)
     ├── scoring/              # 검증된 41곡 + iTunes 응답 660건 녹화
-    └── test_youtube_pick.py
+    ├── test_share.py         # 공유 ID 왕복 + OG 페이지 이스케이프
+    ├── test_youtube_pick.py
+    └── test_platform_contract.py   # ⚠ 프론트 src/constants/platforms.js 를 읽는다
 ```
 
 `__init__.py`는 모두 빈 파일이지만 *명시적 패키지화*를 위해 존재합니다 (PEP 420 namespace package 회피).
@@ -352,6 +355,20 @@ uv run uvicorn main:app --reload      # http://localhost:8000
 
 자동 문서: `/docs` (Swagger UI), `/redoc`.
 
+### 테스트
+
+```bash
+cd backend
+uv sync --group dev
+uv run pytest -q          # 98개, 네트워크 없이 0.2초
+```
+
+무엇을 왜 지키는지는 [`tests/README.md`](backend/tests/README.md) 에 있습니다. 여기서는 두 가지만 짚습니다.
+
+**매칭 벤치마크(41곡)는 포화 상태입니다.** 41/41 이 스코어러가 좋다는 뜻이 아닙니다 — 6장 끝을 참고하세요.
+
+**`test_platform_contract.py` 는 프론트엔드 소스를 읽습니다.** 플랫폼 식별자가 `Platform` enum, `PlatformIds` 필드, 프론트 카드 `id`, 프론트 `deepLinks` 키 네 곳에 중복 정의돼 있고 어긋나면 조용히 카드가 사라지기 때문입니다. 그래서 `src/constants/platforms.js` 를 고치면 백엔드 `pytest` 가 깨질 수 있습니다. 반대로 이 파일들의 위치를 옮기면 테스트가 파일을 못 찾아 실패합니다 — 이것도 의도된 동작입니다.
+
 ### 운영 — Oracle Cloud
 
 Railway에서 이전했습니다(무료 체험 만료). 현재 구성:
@@ -440,7 +457,7 @@ Oracle 문서: *"Oracle doesn't charge for Always Free resources after you upgra
 
 ## 13. 향후 개선 후보
 
-- 프론트엔드 테스트 — 백엔드는 54개가 생겼지만 프론트는 0개입니다.
+- 매칭 벤치마크 확장 — 현재 41곡은 포화 상태라 채점 임계값을 반증하지 못합니다. 비어 있는 케이스는 `tests/README.md` 참고.
 - 벅스 셀렉터 수정.
 - 아티스트명 로마자 변환 비교(`지드래곤` ↔ `G-DRAGON`).
 - Deezer로 `isrc` 필드 채우기.

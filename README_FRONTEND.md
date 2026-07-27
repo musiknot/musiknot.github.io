@@ -183,12 +183,16 @@ App
 ## 10. 개발 / 배포 명령어
 
 ```bash
-npm run dev       # Vite 개발 서버 (http://localhost:5173)
-npm run build     # 프로덕션 빌드 → dist/
-npm run preview   # 빌드 결과 로컬 미리보기
-npm run lint      # ESLint
-npm run deploy    # vite build && gh-pages -d dist  (GitHub Pages 배포)
+npm run dev        # Vite 개발 서버 (http://localhost:5173)
+npm run build      # 프로덕션 빌드 → dist/
+npm run preview    # 빌드 결과 로컬 미리보기 (기본 포트 4173)
+npm run lint       # ESLint
+npm test           # vitest 1회 실행
+npm run test:watch # vitest 감시 모드
+npm run deploy     # vite build && gh-pages -d dist  (GitHub Pages 배포)
 ```
+
+> ⚠️ `npm run preview` 의 기본 포트 **4173 은 백엔드 CORS 허용 목록에 없습니다** (3000·5173만 있음). 프로덕션 빌드를 로컬에서 확인하려면 `npm run preview -- --port 5173` 을 쓰세요. 안 그러면 검색할 때 `Failed to fetch` 가 납니다 — 코드 버그가 아니라 설정 문제입니다.
 
 배포 후 확인:
 
@@ -197,7 +201,36 @@ curl -s https://musiknot.github.io/ | grep -o 'assets/index-[A-Za-z0-9_-]*\.js'
 # 새 해시로 바뀌었는지 확인 (반영에 30~60초 걸림)
 ```
 
-## 11. 알려진 문제
+## 11. 테스트
+
+```bash
+npm test    # 16개, 네트워크 없이 실행
+```
+
+`vitest` + `@testing-library/react` + `jsdom`. 설정은 `vite.config.js` 의 `test` 블록, 공통 준비는 `src/test/setup.js` 입니다.
+
+**렌더링을 두루 확인하는 테스트가 아닙니다.** 이 프로젝트에서 실제로 깨졌거나 조용히 깨질 수 있는 것만 고정합니다.
+
+| 파일 | 지키는 것 |
+|---|---|
+| `hooks/useParse.test.jsx` | `parse`·`reset`·`parseById` 의 **참조가 유지**되는가 (무한 루프의 근본 원인) |
+| `App.test.jsx` | `?id=` / `?url=` 진입 시 요청이 **정확히 1회**인가 (StrictMode 이중 실행 포함) |
+| `components/ShareWidget.test.jsx` | `navigator.share` 가 없을 때 버튼을 **렌더하지 않는가**, 클립보드 실패 폴백, QR 열기/닫기 |
+
+요청 횟수를 세는 이유는 성능이 아니라 **안전**입니다. `/parse` 한 번이 백엔드에서 외부 호출 약 7건이 되고 거기에 멜론·벅스·FLO 스크래핑이 포함되는데, 그쪽에서 IP 가 차단당하는 것은 이 시스템에서 유일하게 되돌릴 수 없는 실패입니다. 아래 12절의 사고가 바로 그것이었습니다.
+
+회귀를 실제로 잡는지 확인했습니다 — `useParse` 의 `useCallback` 을 없애면 2개, `App` 의 `didAutoSearch` 빗장을 없애면 1개(StrictMode 케이스, 바로 그 루프), 공유 버튼을 조건 없이 렌더하면 1개가 실패합니다.
+
+### 설정에서 걸리는 두 가지
+
+- **`esbuild: { jsx: 'automatic' }` 가 없으면** vitest 가 테스트 파일의 JSX 를 classic 런타임으로 변환해 전부 `React is not defined` 로 죽습니다. 앱 코드는 `@vitejs/plugin-react` 가 처리하지만 테스트 파일은 그 경로를 타지 않습니다.
+- **모킹되지 않은 `fetch` 는 예외를 던집니다.** `undefined` 를 돌려주면 네트워크 모킹을 깜빡한 테스트가 조용히 통과합니다. `setup.js` 는 `matchMedia` 도 스텁합니다 — jsdom 에 없고 `useTheme` 가 씁니다.
+
+### 백엔드와의 경계 계약
+
+플랫폼 식별자는 **네 곳**에 중복 정의돼 있습니다: 백엔드 `Platform` enum, `PlatformIds` 필드, 프론트 카드 `id`, `deepLinks` 키. 어긋나면 아무 오류 없이 해당 카드만 사라집니다. `backend/tests/test_platform_contract.py` 가 `src/constants/platforms.js` 를 직접 읽어 네 곳의 일치를 검증합니다 — 즉 **`platforms.js` 를 고치면 백엔드 `pytest` 가 깨질 수 있습니다.** 그게 의도입니다.
+
+## 12. 알려진 문제
 
 `npm run lint` 는 현재 **오류 0개**입니다.
 
@@ -217,7 +250,7 @@ curl -s https://musiknot.github.io/ | grep -o 'assets/index-[A-Za-z0-9_-]*\.js'
 
 **헤더 드롭다운이 바깥 클릭으로 닫히지 않습니다.** `closeAll()`이 항목 선택 시에만 호출되고 document 클릭 리스너가 없습니다.
 
-## 12. 그 밖에
+## 13. 그 밖에
 
 - 모바일에서는 Android `intent://` 스킴으로 네이티브 앱을 직접 열고, 그 외에는 일반 `https://` 링크로 폴백합니다 (`PlatformCard` + `constants/platforms.js`).
 - `platforms.js`에서 YouTube와 YT Music이 같은 색(`#FF0000`)과 같은 이니셜(`Y`)을 씁니다. 카드가 작을 때 10px 라벨로만 구분됩니다.
