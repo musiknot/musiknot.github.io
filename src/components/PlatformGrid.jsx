@@ -2,11 +2,11 @@ import { PlatformCard } from './PlatformCard'
 import { platforms } from '../constants/platforms'
 
 export function PlatformGrid({ platformIds }) {
-    console.log("platformIds:", platformIds)  // ← 추가
     return (
         <div className="w-full space-y-4">
-            {/* 글로벌 플랫폼 */}
-            <div className="grid grid-cols-4 gap-3">
+            {/* 글로벌 플랫폼 — 5개라 3+2 로 배치된다.
+                한국 그리드와 열 수를 맞춰야 카드 크기가 같아지므로 3열 고정. */}
+            <div className="grid grid-cols-3 gap-3">
                 {platforms.global.map(p => (
                     <PlatformCard
                         key={p.id}

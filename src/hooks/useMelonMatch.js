@@ -1,6 +1,5 @@
 import { useState } from 'react'
-
-const API_URL = 'http://localhost:8000'
+import { API_BASE_URL } from '../constants/api'
 
 export function useMelonMatch() {
     const [result,  setResult]  = useState(null)
@@ -13,7 +12,7 @@ export function useMelonMatch() {
         setError(null)
 
         try {
-            const res = await fetch(`${API_URL}/match`, {
+            const res = await fetch(`${API_BASE_URL}/match`, {
                 method:  'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body:    JSON.stringify({ title, artist })
