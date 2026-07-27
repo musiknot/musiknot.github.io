@@ -91,15 +91,17 @@ async def _find_cross_platform_ids(
             ids[Platform.FLO.value] = results[0].track_id
 
     async def fetch_youtube():
-        # MV 우선
-        if not ids[Platform.YOUTUBE.value]:
-            mv = await youtube.search_mv(title, artist)
-            if mv:
-                ids[Platform.YOUTUBE.value] = mv.track_id
+        if ids[Platform.YOUTUBE.value] and ids[Platform.YOUTUBE_MUSIC.value]:
+            return
 
-        # Topic 채널 음원
+        # 검색 한 번으로 MV 와 Topic 을 함께 받는다. 예전에는 두 번 호출했는데,
+        # search.list 가 100 유닛이라 그것만으로 하루 상한이 절반이 됐다.
+        mv, topic = await youtube.search_mv_and_topic(title, artist)
+
+        if mv and not ids[Platform.YOUTUBE.value]:
+            ids[Platform.YOUTUBE.value] = mv.track_id
+
         if not ids[Platform.YOUTUBE_MUSIC.value]:
-            topic = await youtube.search_topic(title, artist)
             if topic:
                 ids[Platform.YOUTUBE_MUSIC.value] = topic.track_id
             elif ids[Platform.YOUTUBE.value]:

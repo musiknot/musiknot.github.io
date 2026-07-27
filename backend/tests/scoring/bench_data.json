@@ -1,0 +1,506 @@
+[
+ {
+  "id": "kr_bampyeonji",
+  "category": "kr_translated",
+  "native_title": "밤편지",
+  "native_artist": "아이유",
+  "expected_apple_id": "1219218446",
+  "alt_apple_ids": [
+   "1229073406"
+  ],
+  "store": "KR",
+  "note": "US title 'Through the Night'. The documented calc_score=0.05 failure. alt = Palette album pressing.",
+  "verified": "lookup?id=1219218446&country=KR -> trackName='밤편지' artistName='아이유' album='밤편지 - Single'; country=US -> trackName='Through the Night' artistName='IU'; us_title_is_native=False"
+ },
+ {
+  "id": "kr_mullon",
+  "category": "kr_translated",
+  "native_title": "물론",
+  "native_artist": "허각",
+  "expected_apple_id": "1684921446",
+  "alt_apple_ids": [],
+  "store": "KR",
+  "note": "US title 'With you'. The documented calc_score=0.000 failure. Has an '(Instrumental)' twin 1684921447 in the same single.",
+  "verified": "lookup?id=1684921446&country=KR -> trackName='물론' artistName='허각' album='물론 - Single'; country=US -> trackName='With you' artistName='Huh Gak'; us_title_is_native=False"
+ },
+ {
+  "id": "kr_springday",
+  "category": "kr_translated",
+  "native_title": "봄날",
+  "native_artist": "방탄소년단",
+  "expected_apple_id": "1596529381",
+  "alt_apple_ids": [
+   "1627574950"
+  ],
+  "store": "KR",
+  "note": "US title 'Spring Day'. alt = Proof compilation pressing. A '(Live)' twin exists.",
+  "verified": "lookup?id=1596529381&country=KR -> trackName='봄날' artistName='방탄소년단' album='YOU NEVER WALK ALONE'; country=US -> trackName='Spring Day' artistName='BTS'; us_title_is_native=False"
+ },
+ {
+  "id": "kr_goodday",
+  "category": "kr_translated",
+  "native_title": "좋은 날",
+  "native_artist": "아이유",
+  "expected_apple_id": "409076748",
+  "alt_apple_ids": [],
+  "store": "KR",
+  "note": "US title 'Good Day'. '(Instrumental)' twin 409076759 sits at rank 1 in KR search.",
+  "verified": "lookup?id=409076748&country=KR -> trackName='좋은 날' artistName='아이유' album='Real'; country=US -> trackName='Good Day' artistName='IU'; us_title_is_native=False"
+ },
+ {
+  "id": "kr_cherry",
+  "category": "kr_translated",
+  "native_title": "벚꽃 엔딩",
+  "native_artist": "버스커 버스커",
+  "expected_apple_id": "1570572282",
+  "alt_apple_ids": [],
+  "store": "KR",
+  "note": "US title 'Cherry Blossom Ending'. Apple artist is '버스커버스커' (no space) vs Melon's '버스커 버스커' - realistic artist-string noise. Several MR/karaoke traps in the top 5.",
+  "verified": "lookup?id=1570572282&country=KR -> trackName='벚꽃 엔딩' artistName='버스커버스커' album='버스커버스커 1집'; country=US -> trackName='Cherry Blossom Ending' artistName='Busker Busker'; us_title_is_native=False"
+ },
+ {
+  "id": "kr_ganeun",
+  "category": "kr_translated",
+  "native_title": "사랑은 늘 도망가",
+  "native_artist": "임영웅",
+  "expected_apple_id": "1589204991",
+  "alt_apple_ids": [],
+  "store": "KR",
+  "note": "OST track with an '(Inst.)' twin 1589204992 in the same single.",
+  "verified": "lookup?id=1589204991&country=KR -> trackName='사랑은 늘 도망가' artistName='임영웅' album='신사와 아가씨 (Original Television Soundtrack), Pt. 2 - Single'; country=US -> trackName='Love Always Run Away' artistName='Lim Young Woong'; us_title_is_native=False"
+ },
+ {
+  "id": "kr_eotteoke",
+  "category": "kr_translated",
+  "native_title": "어떻게 이별까지 사랑하겠어, 널 사랑하는 거지",
+  "native_artist": "악뮤",
+  "expected_apple_id": "1480802550",
+  "alt_apple_ids": [],
+  "store": "KR",
+  "note": "US title \"How Can I Love the Heartbreak, You're the One I Love\". Very long title; a TOUR LIVE pressing 1521972947 and a ZZang KARAOKE cover both compete.",
+  "verified": "lookup?id=1480802550&country=KR -> trackName='어떻게 이별까지 사랑하겠어, 널 사랑하는 거지' artistName='악뮤' album='항해'; country=US -> trackName=\"How can I love the heartbreak, you're the one I love\" artistName='AKMU'; us_title_is_native=False"
+ },
+ {
+  "id": "kr_chwijung",
+  "category": "kr_translated",
+  "native_title": "취중고백",
+  "native_artist": "김민석",
+  "expected_apple_id": "1600651334",
+  "alt_apple_ids": [],
+  "store": "KR",
+  "note": "US title 'Drunken Confession'. Two other artists ('Feel', '점잖은 원숭이들') have songs with the identical Korean title.",
+  "verified": "lookup?id=1600651334&country=KR -> trackName='취중고백' artistName='김민석' album='취중고백 - Single'; country=US -> trackName='DrunKen Confession' artistName='Kim Min Seok'; us_title_is_native=False"
+ },
+ {
+  "id": "kr_seoreun",
+  "category": "kr_native_only",
+  "native_title": "서른 즈음에",
+  "native_artist": "김광석",
+  "expected_apple_id": "1501124618",
+  "alt_apple_ids": [
+   "1501113535"
+  ],
+  "store": "KR",
+  "note": "No English title on any storefront - must degrade gracefully. Remaster twins and a 터치드 tribute cover compete.",
+  "verified": "lookup?id=1501124618&country=KR -> trackName='서른 즈음에' artistName='김광석' album='김광석 네번째'; country=US -> trackName='서른 즈음에' artistName='Kim Kwang Seok'; us_title_is_native=True"
+ },
+ {
+  "id": "kr_bulgeun",
+  "category": "kr_native_only",
+  "native_title": "붉은 노을",
+  "native_artist": "이문세",
+  "expected_apple_id": "1455176913",
+  "alt_apple_ids": [
+   "1461532124",
+   "1455180428"
+  ],
+  "store": "KR",
+  "note": "No English title. BIGBANG's famous cover of the same title sits at rank 1 - artist must decide.",
+  "verified": "lookup?id=1455176913&country=KR -> trackName='붉은 노을' artistName='이문세' album='5집'; country=US -> trackName='붉은 노을' artistName='Lee Moon Sae'; us_title_is_native=True"
+ },
+ {
+  "id": "kr_georieseo",
+  "category": "kr_native_only",
+  "native_title": "거리에서",
+  "native_artist": "성시경",
+  "expected_apple_id": "1543850904",
+  "alt_apple_ids": [],
+  "store": "KR",
+  "note": "No English title. Three different artists (성시경/윤종신/김광석) have a song called '거리에서'.",
+  "verified": "lookup?id=1543850904&country=KR -> trackName='거리에서' artistName='성시경' album='The Ballads'; country=US -> trackName='거리에서' artistName='Sung Si Kyung'; us_title_is_native=True"
+ },
+ {
+  "id": "kr_heundeullineun",
+  "category": "kr_translated",
+  "native_title": "흔들리는 꽃들 속에서 네 샴푸향이 느껴진거야",
+  "native_artist": "장범준",
+  "expected_apple_id": "1645250529",
+  "alt_apple_ids": [
+   "1569279910"
+  ],
+  "store": "KR",
+  "note": "US title 'Your Shampoo Scent In the Flowers' (verified). Extremely long native title (22 chars); '(Instrumental)' twin and a 플로우뮤직 piano cover compete. alt = OST Pt.3 single pressing.",
+  "verified": "lookup?id=1645250529&country=KR -> trackName='흔들리는 꽃들 속에서 네 샴푸향이 느껴진거야' artistName='장범준' album='멜로가 체질 (Original Television Soundtrack)'; country=US -> trackName='Your Shampoo Scent In the Flowers' artistName='Jang Beom June'; us_title_is_native=False"
+ },
+ {
+  "id": "kr_neoreul",
+  "category": "kr_translated",
+  "native_title": "너를 만나",
+  "native_artist": "폴킴",
+  "expected_apple_id": "1732909766",
+  "alt_apple_ids": [],
+  "store": "KR",
+  "note": "US title 'Me After You' (verified). KR search rank 0 is the WRONG song ('있잖아' by the same artist) - this row specifically tests scanning the top 3-5 instead of taking rank 0.",
+  "verified": "lookup?id=1732909766&country=KR -> trackName='너를 만나' artistName='폴킴' album='너를 만나 - Single'; country=US -> trackName='Me After You' artistName='Paul Kim'; us_title_is_native=False"
+ },
+ {
+  "id": "kr_yetsarang",
+  "category": "kr_native_only",
+  "native_title": "옛사랑",
+  "native_artist": "이문세",
+  "expected_apple_id": "1823608078",
+  "alt_apple_ids": [
+   "1801201302"
+  ],
+  "store": "KR",
+  "note": "No English title. Apple spells it '옛 사랑' (with a space) vs Melon's '옛사랑'; a '옛 사랑 II' and a (Live) also compete.",
+  "verified": "lookup?id=1823608078&country=KR -> trackName='옛 사랑' artistName='이문세' album='이문세 7집 [VII]'; country=US -> trackName='옛 사랑' artistName='Lee Moon Sae'; us_title_is_native=True"
+ },
+ {
+  "id": "kr_ibyeol",
+  "category": "kr_native_only",
+  "native_title": "이별택시",
+  "native_artist": "김연우",
+  "expected_apple_id": "1623108955",
+  "alt_apple_ids": [],
+  "store": "KR",
+  "note": "No English title. A duet re-recording (김연우 & 이석훈) competes.",
+  "verified": "lookup?id=1623108955&country=KR -> trackName='이별택시' artistName='김연우' album='연인'; country=US -> trackName='이별택시' artistName='Kim Yeon Woo'; us_title_is_native=True"
+ },
+ {
+  "id": "jp_uchiage",
+  "category": "jp_translated",
+  "native_title": "打上花火",
+  "native_artist": "DAOKO",
+  "expected_apple_id": "1263790415",
+  "alt_apple_ids": [],
+  "store": "JP",
+  "note": "US title 'Fireworks'. Apple's artist is 'DAOKO×米津玄師' but the source platform hands over only 'DAOKO' - partial-artist stress case. An オルゴール cover and a MAY-DOG cover of the same title compete.",
+  "verified": "lookup?id=1263790415&country=JP -> trackName='打上花火' artistName='DAOKO×米津玄師' album='打上花火 - Single'; country=US -> trackName='Uchiagehanabi' artistName='DAOKO×米津玄師'; us_title_is_native=False"
+ },
+ {
+  "id": "jp_ussewa",
+  "category": "jp_translated",
+  "native_title": "うっせぇわ",
+  "native_artist": "Ado",
+  "expected_apple_id": "1535123742",
+  "alt_apple_ids": [
+   "1603820308"
+  ],
+  "store": "JP",
+  "note": "Romanized US title 'Usseewa'. '(Giga Remix)' and '(Piano Ver.)' twins compete.",
+  "verified": "lookup?id=1535123742&country=JP -> trackName='うっせぇわ' artistName='Ado' album='うっせぇわ - Single'; country=US -> trackName='Usseewa' artistName='Ado'; us_title_is_native=False"
+ },
+ {
+  "id": "jp_shinunoga",
+  "category": "jp_translated",
+  "native_title": "死ぬのがいいわ",
+  "native_artist": "藤井 風",
+  "expected_apple_id": "1505498792",
+  "alt_apple_ids": [
+   "1748185866"
+  ],
+  "store": "JP",
+  "note": "Romanized US title 'Shinunoga E-Wa'. Appears on many playlist compilations with distinct trackIds.",
+  "verified": "lookup?id=1505498792&country=JP -> trackName='死ぬのがいいわ' artistName='藤井 風' album='HELP EVER HURT NEVER'; country=US -> trackName='Shinunoga E-Wa' artistName='Fujii Kaze'; us_title_is_native=False"
+ },
+ {
+  "id": "jp_yorunikakeru",
+  "category": "jp_translated",
+  "native_title": "夜に駆ける",
+  "native_artist": "YOASOBI",
+  "expected_apple_id": "1542182776",
+  "alt_apple_ids": [
+   "1490256995"
+  ],
+  "store": "JP",
+  "note": "Romanized US title 'Racing Into the Night'. 'From THE FIRST TAKE', 初音ミク Ver. and オルゴール twins compete. alt = original single pressing.",
+  "verified": "lookup?id=1542182776&country=JP -> trackName='夜に駆ける' artistName='YOASOBI' album='THE BOOK'; country=US -> trackName='Yoru ni kakeru' artistName='YOASOBI'; us_title_is_native=False"
+ },
+ {
+  "id": "jp_zankoku",
+  "category": "jp_translated",
+  "native_title": "残酷な天使のテーゼ",
+  "native_artist": "高橋洋子",
+  "expected_apple_id": "258926790",
+  "alt_apple_ids": [
+   "983860734",
+   "1549545978",
+   "1554031702"
+  ],
+  "store": "JP",
+  "note": "US title 'A Cruel Angel's Thesis'. Many legitimate pressings of the same recording.",
+  "verified": "lookup?id=258926790&country=JP -> trackName='残酷な天使のテーゼ' artistName='高橋洋子' album='残酷な天使のテーゼ - EP'; country=US -> trackName=\"The Cruel Angel's Thesis\" artistName='Yoko Takahashi'; us_title_is_native=False"
+ },
+ {
+  "id": "jp_koi",
+  "category": "jp_translated",
+  "native_title": "恋",
+  "native_artist": "星野源",
+  "expected_apple_id": "1156375396",
+  "alt_apple_ids": [
+   "1444990824"
+  ],
+  "store": "JP",
+  "note": "US title 'Koi'. Single-character native title - the shortest possible string, worst case for SequenceMatcher.",
+  "verified": "lookup?id=1156375396&country=JP -> trackName='恋' artistName='星野源' album='恋 - EP'; country=US -> trackName='Koi' artistName='Gen Hoshino'; us_title_is_native=False"
+ },
+ {
+  "id": "jp_idol",
+  "category": "jp_translated",
+  "native_title": "アイドル",
+  "native_artist": "YOASOBI",
+  "expected_apple_id": "1679278167",
+  "alt_apple_ids": [
+   "1707581765"
+  ],
+  "store": "JP",
+  "note": "US title 'Idol'. YOASOBI released a SEPARATE English-language recording literally titled 'Idol' (id 1688334537) - a design that trusts an English title blindly will pick the wrong recording.",
+  "verified": "lookup?id=1679278167&country=JP -> trackName='アイドル' artistName='YOASOBI' album='アイドル - Single'; country=US -> trackName='Idol' artistName='YOASOBI'; us_title_is_native=False"
+ },
+ {
+  "id": "mx_ditto",
+  "category": "mixed_ascii",
+  "native_title": "Ditto",
+  "native_artist": "뉴진스",
+  "expected_apple_id": "1657231962",
+  "alt_apple_ids": [
+   "1659513448"
+  ],
+  "store": "KR",
+  "note": "ASCII title, native artist. `title.isascii() and artist.isascii()` is False so the old guard sends this down the translation path unnecessarily. '(250 Remix)' twins compete.",
+  "verified": "lookup?id=1657231962&country=KR -> trackName='Ditto' artistName='뉴진스' album='Ditto - Single'; country=US -> trackName='Ditto' artistName='NewJeans'; us_title_is_native=True"
+ },
+ {
+  "id": "mx_lemon",
+  "category": "mixed_ascii",
+  "native_title": "Lemon",
+  "native_artist": "米津玄師",
+  "expected_apple_id": "1537460612",
+  "alt_apple_ids": [
+   "1538265741"
+  ],
+  "store": "JP",
+  "note": "ASCII title, Japanese artist. music-box / inst / karaoke covers of 'Lemon' saturate the top 5.",
+  "verified": "lookup?id=1537460612&country=JP -> trackName='Lemon' artistName='米津玄師' album='Lemon - Single'; country=US -> trackName='Lemon' artistName='Kenshi Yonezu'; us_title_is_native=True"
+ },
+ {
+  "id": "mx_blueming",
+  "category": "mixed_ascii",
+  "native_title": "Blueming",
+  "native_artist": "아이유",
+  "expected_apple_id": "1488300930",
+  "alt_apple_ids": [],
+  "store": "KR",
+  "note": "ASCII title, native artist. Four of the KR top 5 are piano/MR covers with the identical ASCII title - artist is the only discriminator.",
+  "verified": "lookup?id=1488300930&country=KR -> trackName='Blueming' artistName='아이유' album='Love Poem - EP'; country=US -> trackName='Blueming' artistName='IU'; us_title_is_native=True"
+ },
+ {
+  "id": "mx_celebrity",
+  "category": "mixed_ascii",
+  "native_title": "Celebrity",
+  "native_artist": "아이유",
+  "expected_apple_id": "1550907178",
+  "alt_apple_ids": [
+   "1560113348"
+  ],
+  "store": "KR",
+  "note": "ASCII title, native artist. alt = LILAC album pressing of the same recording.",
+  "verified": "lookup?id=1550907178&country=KR -> trackName='Celebrity' artistName='아이유' album='Celebrity - Single'; country=US -> trackName='Celebrity' artistName='IU'; us_title_is_native=True"
+ },
+ {
+  "id": "mx_hypeboy",
+  "category": "mixed_ascii",
+  "native_title": "Hype Boy",
+  "native_artist": "뉴진스",
+  "expected_apple_id": "1635469851",
+  "alt_apple_ids": [],
+  "store": "KR",
+  "note": "ASCII title, native artist. Four '(250 Remix)' variants occupy ranks 1-4.",
+  "verified": "lookup?id=1635469851&country=KR -> trackName='Hype Boy' artistName='뉴진스' album=\"NewJeans 1st EP 'New Jeans'\"; country=US -> trackName='Hype Boy' artistName='NewJeans'; us_title_is_native=True"
+ },
+ {
+  "id": "mx_kickback",
+  "category": "mixed_ascii",
+  "native_title": "KICK BACK",
+  "native_artist": "米津玄師",
+  "expected_apple_id": "1648272180",
+  "alt_apple_ids": [
+   "1653922188",
+   "1759899365"
+  ],
+  "store": "JP",
+  "note": "ASCII (all-caps) title, Japanese artist. '-ANIME edit' and a Frost Children Remix compete.",
+  "verified": "lookup?id=1648272180&country=JP -> trackName='KICK BACK' artistName='米津玄師' album='KICK BACK - Single'; country=US -> trackName='KICK BACK' artistName='Kenshi Yonezu'; us_title_is_native=True"
+ },
+ {
+  "id": "en_blinding",
+  "category": "en_control",
+  "native_title": "Blinding Lights",
+  "native_artist": "The Weeknd",
+  "expected_apple_id": "1488408568",
+  "alt_apple_ids": [
+   "1499378607",
+   "1615128020"
+  ],
+  "store": "US",
+  "note": "CONTROL. Must not regress. '(Remix)' and Chromatics remix compete.",
+  "verified": "lookup?id=1488408568&country=US -> trackName='Blinding Lights' artistName='The Weeknd' album='Blinding Lights - Single'; country=US -> trackName='Blinding Lights' artistName='The Weeknd'; us_title_is_native=True"
+ },
+ {
+  "id": "en_shapeofyou",
+  "category": "en_control",
+  "native_title": "Shape of You",
+  "native_artist": "Ed Sheeran",
+  "expected_apple_id": "1193701392",
+  "alt_apple_ids": [
+   "1193700767",
+   "1545594728"
+  ],
+  "store": "US",
+  "note": "CONTROL. Deluxe vs standard ÷ pressing.",
+  "verified": "lookup?id=1193701392&country=US -> trackName='Shape of You' artistName='Ed Sheeran' album='÷ (Deluxe)'; country=US -> trackName='Shape of You' artistName='Ed Sheeran'; us_title_is_native=True"
+ },
+ {
+  "id": "en_bohemian",
+  "category": "en_control",
+  "native_title": "Bohemian Rhapsody",
+  "native_artist": "Queen",
+  "expected_apple_id": "1440650711",
+  "alt_apple_ids": [
+   "1440806768",
+   "1440651222"
+  ],
+  "store": "US",
+  "note": "CONTROL. '(Live)' and 'Operatic Section / A Cappella Mix' twins compete.",
+  "verified": "lookup?id=1440650711&country=US -> trackName='Bohemian Rhapsody' artistName='Queen' album='Greatest Hits I, II & III: The Platinum Collection'; country=US -> trackName='Bohemian Rhapsody' artistName='Queen'; us_title_is_native=True"
+ },
+ {
+  "id": "en_someone",
+  "category": "en_control",
+  "native_title": "Someone Like You",
+  "native_artist": "Adele",
+  "expected_apple_id": "1544491998",
+  "alt_apple_ids": [],
+  "store": "US",
+  "note": "CONTROL. Lullaby/tribute covers with the identical title occupy ranks 1-4.",
+  "verified": "lookup?id=1544491998&country=US -> trackName='Someone Like You' artistName='Adele' album='21'; country=US -> trackName='Someone Like You' artistName='Adele'; us_title_is_native=True"
+ },
+ {
+  "id": "en_uptown",
+  "category": "en_control",
+  "native_title": "Uptown Funk",
+  "native_artist": "Mark Ronson",
+  "expected_apple_id": "943946671",
+  "alt_apple_ids": [
+   "938032045",
+   "956024318",
+   "984607460"
+  ],
+  "store": "US",
+  "note": "CONTROL. Apple's trackName is 'Uptown Funk (feat. Bruno Mars)' - input title is a strict prefix, tests tolerance of feat. suffixes.",
+  "verified": "lookup?id=943946671&country=US -> trackName='Uptown Funk (feat. Bruno Mars)' artistName='Mark Ronson' album='Uptown Special'; country=US -> trackName='Uptown Funk (feat. Bruno Mars)' artistName='Mark Ronson'; us_title_is_native=True"
+ },
+ {
+  "id": "en_rolling",
+  "category": "en_control",
+  "native_title": "Rolling in the Deep",
+  "native_artist": "Adele",
+  "expected_apple_id": "1544491233",
+  "alt_apple_ids": [],
+  "store": "US",
+  "note": "CONTROL. '(Live)' and remix twins compete.",
+  "verified": "lookup?id=1544491233&country=US -> trackName='Rolling in the Deep' artistName='Adele' album='21'; country=US -> trackName='Rolling in the Deep' artistName='Adele'; us_title_is_native=True"
+ },
+ {
+  "id": "en_viva",
+  "category": "en_control",
+  "native_title": "Viva La Vida",
+  "native_artist": "Coldplay",
+  "expected_apple_id": "1122773680",
+  "alt_apple_ids": [
+   "1122778616"
+  ],
+  "store": "US",
+  "note": "CONTROL. Three live pressings compete.",
+  "verified": "lookup?id=1122773680&country=US -> trackName='Viva La Vida' artistName='Coldplay' album='Viva La Vida or Death and All His Friends'; country=US -> trackName='Viva La Vida' artistName='Coldplay'; us_title_is_native=True"
+ },
+ {
+  "id": "tr_event_horizon",
+  "category": "tricky",
+  "native_title": "사건의 지평선",
+  "native_artist": "윤하",
+  "expected_apple_id": "1616649362",
+  "alt_apple_ids": [],
+  "store": "KR",
+  "note": "THE documented trap: with a raw native query the old scorer preferred a karaoke/cover ('NEWAGES'/'닥터스') at 0.6 while the real Younha track scored 0.06. A 플로우뮤직 piano cover is also in the top 5.",
+  "verified": "lookup?id=1616649362&country=KR -> trackName='사건의 지평선' artistName='윤하' album=\"YOUNHA 6th Album Repackage 'END THEORY : Final Edition'\"; country=US -> trackName='Event Horizon' artistName='Younha'; us_title_is_native=False"
+ },
+ {
+  "id": "tr_lovestory",
+  "category": "tricky",
+  "native_title": "Love Story (Taylor's Version)",
+  "native_artist": "Taylor Swift",
+  "expected_apple_id": "1552791427",
+  "alt_apple_ids": [],
+  "store": "US",
+  "note": "RE-RECORDING. The 2008 original 'Love Story' (1440924808) is a different recording with a shorter, higher-similarity title - a scorer that strips or under-weights the parenthetical picks the wrong one.",
+  "verified": "lookup?id=1552791427&country=US -> trackName='Love Story (Taylor’s Version)' artistName='Taylor Swift' album=\"Fearless (Taylor's Version)\"; country=US -> trackName='Love Story (Taylor’s Version)' artistName='Taylor Swift'; us_title_is_native=True"
+ },
+ {
+  "id": "tr_aroha",
+  "category": "tricky",
+  "native_title": "아로하",
+  "native_artist": "조정석",
+  "expected_apple_id": "1570389411",
+  "alt_apple_ids": [
+   "1603349032"
+  ],
+  "store": "KR",
+  "note": "'(Instrumental)' TWIN case: 1570389414 is the instrumental in the SAME single by the SAME artist, so title+artist similarity is near-identical and only the variant filter separates them.",
+  "verified": "lookup?id=1570389411&country=KR -> trackName='아로하' artistName='조정석' album='슬기로운 의사생활, Pt. 3 (Original Television Soundtrack) - Single'; country=US -> trackName='Aloha' artistName='Cho Jung-seok'; us_title_is_native=False"
+ },
+ {
+  "id": "tr_hotel",
+  "category": "tricky",
+  "native_title": "Hotel California",
+  "native_artist": "Eagles",
+  "expected_apple_id": "635770202",
+  "alt_apple_ids": [],
+  "store": "US",
+  "note": "Four of the US top 5 are LIVE recordings of the same song by the same artist; only the variant filter / album signal separates the studio original.",
+  "verified": "lookup?id=635770202&country=US -> trackName='Hotel California' artistName='Eagles' album='Hotel California'; country=US -> trackName='Hotel California' artistName='Eagles'; us_title_is_native=True"
+ },
+ {
+  "id": "tr_sinhodeung",
+  "category": "tricky",
+  "native_title": "신호등",
+  "native_artist": "이무진",
+  "expected_apple_id": "1567544638",
+  "alt_apple_ids": [],
+  "store": "KR",
+  "note": "US title 'Traffic Light'. A 플로우뮤직 piano cover carrying the exact native title '신호등 (이무진) [피아노]' competes.",
+  "verified": "lookup?id=1567544638&country=KR -> trackName='신호등' artistName='이무진' album='신호등 - Single'; country=US -> trackName='Traffic Light' artistName='LEE Mujin'; us_title_is_native=False"
+ },
+ {
+  "id": "tr_byeol",
+  "category": "tricky",
+  "native_title": "별 보러 가자",
+  "native_artist": "박보검",
+  "expected_apple_id": "1438846697",
+  "alt_apple_ids": [],
+  "store": "KR",
+  "note": "Near-homograph artist trap: 박보검 (correct) vs 박보람 (a different, also-charting artist). One character apart, SequenceMatcher artist similarity = 0.67.",
+  "verified": "lookup?id=1438846697&country=KR -> trackName='별 보러 가자' artistName='박보검' album='별 보러 가자 - Single'; country=US -> trackName=\"Let's Go See the Stars\" artistName='Park Bo Gum'; us_title_is_native=False"
+ }
+]
