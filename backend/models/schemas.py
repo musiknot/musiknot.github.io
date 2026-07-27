@@ -1,5 +1,5 @@
 from enum import Enum
-from pydantic import BaseModel
+from pydantic import BaseModel, model_validator
 
 
 # ── 도메인 모델 ────────────────────────────────────
@@ -51,7 +51,20 @@ class MatchResponse(BaseModel):
 # ── /parse API 스키마 ────────────────────────────
 
 class ParseRequest(BaseModel):
-    url: str
+    """음원 URL 또는 공유 ID 중 **정확히 하나**를 받는다.
+
+    공유 ID(`melon:30314784`)는 짧은 공유 링크용이다. 둘 다 오거나 둘 다
+    없으면 조용히 하나를 고르지 않고 422 로 거절한다 — 어느 쪽을 썼는지
+    호출자가 착각한 채로 동작하는 게 더 나쁘기 때문이다.
+    """
+    url: str | None = None
+    id:  str | None = None
+
+    @model_validator(mode="after")
+    def _exactly_one(self):
+        if bool(self.url) == bool(self.id):
+            raise ValueError("url 과 id 중 정확히 하나를 지정해야 합니다")
+        return self
 
 
 class PlatformIds(BaseModel):
@@ -72,6 +85,9 @@ class ParseResponse(BaseModel):
     albumArt:  str | None = None
     isrc:      str | None = None
     platforms: PlatformIds
+    # 공유 링크용 짧은 식별자 (`melon:30314784`). 입력 URL 이 가리키던 플랫폼
+    # 기준으로 만든다. 프론트가 이 값으로 공유 URL 을 조립한다.
+    shareId:   str | None = None
 
 
 # ── 변환 헬퍼 ──────────────────────────────────────

@@ -12,7 +12,7 @@ from models.schemas import (
     Track,
 )
 from services import bugs, flo, itunes, melon, url_resolver, youtube
-from utils.platform_url import extract_platform_id
+from utils.platform_url import build_share_id, extract_platform_id, parse_share_id
 
 log    = logging.getLogger(__name__)
 router = APIRouter()
@@ -117,22 +117,31 @@ async def _find_cross_platform_ids(
 
 @router.post("/parse", response_model=ParseResponse)
 async def parse_url(req: ParseRequest):
-    url = req.url
+    # 공유 ID 로 들어온 경우 — URL 해제·정규식 단계를 건너뛴다.
+    # ID 자체가 이미 (platform, track_id) 이기 때문이다.
+    if req.id:
+        parsed = parse_share_id(req.id)
+        if not parsed:
+            raise HTTPException(status_code=400, detail="잘못된 공유 ID 입니다.")
+        platform, track_id = parsed
+        log.info("Share id → platform=%s, id=%s", platform.value, track_id)
+    else:
+        url = req.url
 
-    # STEP 1: 단축 URL 해제
-    if "kko.to" in url or "flomuz.io" in url:
-        try:
-            url = await url_resolver.resolve_url(url)
-            log.info("Short URL resolved → %s", url)
-        except ValueError as e:
-            raise HTTPException(status_code=400, detail=str(e))
+        # STEP 1: 단축 URL 해제
+        if "kko.to" in url or "flomuz.io" in url:
+            try:
+                url = await url_resolver.resolve_url(url)
+                log.info("Short URL resolved → %s", url)
+            except ValueError as e:
+                raise HTTPException(status_code=400, detail=str(e))
 
-    # STEP 2: 플랫폼 감지
-    parsed = extract_platform_id(url)
-    if not parsed:
-        raise HTTPException(status_code=400, detail="지원하지 않는 플랫폼입니다.")
-    platform, track_id = parsed
-    log.info("Detected platform=%s, id=%s", platform.value, track_id)
+        # STEP 2: 플랫폼 감지
+        parsed = extract_platform_id(url)
+        if not parsed:
+            raise HTTPException(status_code=400, detail="지원하지 않는 플랫폼입니다.")
+        platform, track_id = parsed
+        log.info("Detected platform=%s, id=%s", platform.value, track_id)
 
     # STEP 3: 해당 플랫폼에서 곡 정보 조회
     lookup = _LOOKUP_BY_PLATFORM.get(platform)
@@ -158,4 +167,5 @@ async def parse_url(req: ParseRequest):
         albumArt  = track.album_art,
         isrc      = None,
         platforms = platform_ids,
+        shareId   = build_share_id(platform, track_id),
     )

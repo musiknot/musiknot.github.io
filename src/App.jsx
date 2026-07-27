@@ -9,7 +9,7 @@ import { ResultView } from './pages/ResultView'
 export default function App() {
     const { theme, setTheme, isDark }   = useTheme()
     const { lang, setLanguage, t }      = useLanguage()
-    const { result, loading, error, parse, reset } = useParse()
+    const { result, loading, error, parse, parseById, reset } = useParse()
     const [history, setHistory]         = useState([])
 
     // URL 자동 검색이 두 번 이상 일어나지 않게 하는 빗장.
@@ -31,6 +31,14 @@ export default function App() {
         window.scrollTo(0, 0)
     }, [parse])
 
+    // 공유 링크(?id=)로 들어온 경우. URL 검증을 거치지 않고 백엔드에 ID 를 그대로
+    // 넘긴다 — ID 는 URL 이 아니라 (플랫폼, 트랙ID) 쌍이라서 화이트리스트 검증
+    // 대상이 아니고, 형식 검증은 백엔드가 한다.
+    const handleSearchById = useCallback((id) => {
+        parseById(id)
+        window.scrollTo(0, 0)
+    }, [parseById])
+
     // 최초 진입 시 URL로 자동 검색.
     //
     // react-hooks/set-state-in-effect 를 여기서만 끈다. 이 규칙은 effect 안에서
@@ -44,8 +52,16 @@ export default function App() {
         if (didAutoSearch.current) return
         didAutoSearch.current = true
 
-        // ?url= 쿼리스트링 — 정적 호스팅에서 확실히 동작하는 방식
         const params = new URLSearchParams(window.location.search)
+
+        // ?id= 공유 링크 (`melon:30314784`). 짧고 QR 로 만들기 좋다.
+        const idParam = params.get('id')
+        if (idParam) {
+            handleSearchById(idParam)
+            return
+        }
+
+        // ?url= 원본 음원 링크 — 붙여넣기 경로
         const urlParam = params.get('url')
         if (urlParam) {
             handleSearch(urlParam)
@@ -68,7 +84,7 @@ export default function App() {
                 }
             }
         }
-    }, [handleSearch])
+    }, [handleSearch, handleSearchById])
     /* eslint-enable react-hooks/set-state-in-effect */
 
     const handleBack = () => {

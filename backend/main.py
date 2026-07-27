@@ -3,7 +3,7 @@ import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from routers import match, parse
+from routers import match, parse, share
 
 logging.basicConfig(
     level=logging.INFO,
@@ -25,6 +25,9 @@ app.add_middleware(
 
 app.include_router(match.router)
 app.include_router(parse.router)
+# /s/{id} — 브라우저와 크롤러가 직접 여는 HTML. CORS 와 무관하다
+# (fetch 가 아니라 페이지 이동이므로).
+app.include_router(share.router)
 
 
 @app.get("/")

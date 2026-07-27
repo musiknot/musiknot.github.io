@@ -36,10 +36,32 @@ export function useParse() {
         }
     }, [])
 
+    // 공유 ID(`melon:30314784`)로 조회. URL 이 아니므로 validateUrl 을 거치지
+    // 않고, 형식 검증은 백엔드가 한다(플랫폼 화이트리스트 + 문자·길이 제한).
+    const parseById = useCallback(async (id) => {
+        setLoading(true)
+        setResult(null)
+        setError(null)
+
+        try {
+            const res = await fetch(`${API_BASE_URL}/parse`, {
+                method:  'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body:    JSON.stringify({ id })
+            })
+            if (!res.ok) throw new Error('서버 오류')
+            setResult(await res.json())
+        } catch (e) {
+            setError(e.message)
+        } finally {
+            setLoading(false)
+        }
+    }, [])
+
     const reset = useCallback(() => {
         setResult(null)
         setError(null)
     }, [])
 
-    return { result, loading, error, parse, reset }
+    return { result, loading, error, parse, parseById, reset }
 }
