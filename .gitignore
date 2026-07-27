@@ -29,3 +29,6 @@ __pycache__/
 *.py[cod]
 .venv/
 .python-version
+# 예외: backend/.python-version 은 배포 런타임 핀이다 (uv 가 읽고,
+# 서비스 루트가 backend/ 일 때 Railpack/mise 도 읽는다). 커밋되어야 한다.
+!backend/.python-version
