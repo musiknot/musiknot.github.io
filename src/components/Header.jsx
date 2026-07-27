@@ -1,6 +1,13 @@
 import { useState } from 'react'
 import { Menu, X, Sun, Moon, Monitor } from 'lucide-react'
 
+// 드롭다운에 현재 선택된 테마를 표시하기 위해 목록으로 관리한다.
+const THEME_OPTIONS = [
+    { value: 'system', Icon: Monitor, labelKey: 'themeSystem' },
+    { value: 'light',  Icon: Sun,     labelKey: 'themeLight'  },
+    { value: 'dark',   Icon: Moon,    labelKey: 'themeDark'   },
+]
+
 export function Header({ theme, setTheme, isDark, lang, setLanguage, t, onHome }) {
     const [menuOpen,  setMenuOpen]  = useState(false)
     const [themeOpen, setThemeOpen] = useState(false)
@@ -64,15 +71,19 @@ export function Header({ theme, setTheme, isDark, lang, setLanguage, t, onHome }
                     </button>
                     {themeOpen && (
                         <div className="absolute right-0 top-full mt-2 bg-white/95 dark:bg-zinc-900/95 backdrop-blur-xl border border-gray-200 dark:border-zinc-800 rounded-2xl shadow-xl p-2 z-50 w-48">
-                            <button onClick={() => { setTheme('system'); closeAll() }} className="flex items-center w-full px-4 py-2.5 text-sm font-bold hover:bg-gray-100 dark:hover:bg-zinc-800 rounded-xl transition-colors">
-                                <Monitor className="w-4 h-4 mr-3" /> {t('themeSystem')}
-                            </button>
-                            <button onClick={() => { setTheme('light'); closeAll() }} className="flex items-center w-full px-4 py-2.5 text-sm font-bold hover:bg-gray-100 dark:hover:bg-zinc-800 rounded-xl transition-colors">
-                                <Sun className="w-4 h-4 mr-3" /> {t('themeLight')}
-                            </button>
-                            <button onClick={() => { setTheme('dark'); closeAll() }} className="flex items-center w-full px-4 py-2.5 text-sm font-bold hover:bg-gray-100 dark:hover:bg-zinc-800 rounded-xl transition-colors">
-                                <Moon className="w-4 h-4 mr-3" /> {t('themeDark')}
-                            </button>
+                            {THEME_OPTIONS.map((opt) => (
+                                <button
+                                    key={opt.value}
+                                    onClick={() => { setTheme(opt.value); closeAll() }}
+                                    className={`flex items-center w-full px-4 py-2.5 text-sm font-bold rounded-xl transition-colors ${
+                                        theme === opt.value
+                                            ? 'bg-gray-100 dark:bg-zinc-800 text-blue-600 dark:text-blue-500'
+                                            : 'hover:bg-gray-100 dark:hover:bg-zinc-800'
+                                    }`}
+                                >
+                                    <opt.Icon className="w-4 h-4 mr-3" /> {t(opt.labelKey)}
+                                </button>
+                            ))}
                         </div>
                     )}
                 </div>
