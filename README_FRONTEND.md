@@ -1,0 +1,193 @@
+# Frontend 구조 (musiknot.github.io)
+
+음악 링크를 입력받아 여러 플랫폼의 동일한 곡 링크를 모아 보여주는 SPA입니다. React + Vite + Tailwind CSS 기반이며, 별도의 라우터·상태관리 라이브러리 없이 React Hooks와 조건부 렌더링으로 동작합니다.
+
+> 최종 갱신 2026-07-27.
+
+## 1. 기술 스택
+
+| 분류 | 항목 | 버전 |
+|---|---|---|
+| Framework | React / React DOM | ^19.2.4 |
+| Build Tool | Vite | ^8.0.4 |
+| Styling | Tailwind CSS (`@tailwindcss/vite`) | ^4.2.2 |
+| Icons | lucide-react | ^1.7.0 |
+| Lint | ESLint + react-hooks/react-refresh | ^9.39.4 |
+| Deploy | gh-pages | ^6.3.0 |
+
+라우터·상태관리 라이브러리는 사용하지 않습니다.
+
+## 2. 디렉터리 레이아웃
+
+```
+musiknot.github.io/
+├── index.html              # 엔트리 HTML, <div id="root"> + main.jsx
+├── vite.config.js          # React + Tailwind 플러그인, base: '/'
+├── src/
+│   ├── main.jsx            # createRoot(StrictMode)
+│   ├── App.jsx             # 최상위 — 전역 상태/뷰 전환
+│   ├── index.css           # Tailwind import + 다크 모드 variant
+│   ├── App.css             # 레거시 템플릿 스타일 (미사용)
+│   ├── components/
+│   │   ├── Header.jsx          # 로고, 테마/언어 스위처, 메뉴
+│   │   ├── SearchBar.jsx       # URL 입력 + 클립보드 붙여넣기
+│   │   ├── HomeView.jsx        # ⚠ 파일이 29행에서 잘려 있음 (7장)
+│   │   ├── PlatformGrid.jsx    # 글로벌/한국 두 그리드
+│   │   └── PlatformCard.jsx    # 개별 플랫폼 카드(딥링크 처리)
+│   ├── pages/
+│   │   ├── HomeView.jsx        # 실제 사용되는 검색 화면
+│   │   └── ResultView.jsx      # 곡 상세 화면
+│   ├── hooks/
+│   │   ├── useTheme.js         # light/dark/system + localStorage
+│   │   ├── useLanguage.js      # ko/en i18n + t() 헬퍼
+│   │   ├── useParse.js         # /parse 호출
+│   │   └── useMelonMatch.js    # /match 호출 — 현재 미사용 (7장)
+│   ├── constants/
+│   │   ├── api.js              # ★ 백엔드 베이스 URL (단일 출처)
+│   │   ├── translations.js     # ko/en 문자열
+│   │   └── platforms.js        # 플랫폼 메타데이터 + 딥링크 빌더
+│   ├── utils/
+│   │   └── urlValidator.js     # 지원 음원 서비스 URL 화이트리스트
+│   └── assets/                 # 미사용 placeholder
+├── legacy/                 # 구버전 정적 페이지 보관
+└── backend/                # FastAPI 백엔드 (README_BACKEND.md 참고)
+```
+
+## 3. 부팅 흐름
+
+1. `index.html` — `<div id="root">` + `<script type="module" src="/src/main.jsx">`
+2. `src/main.jsx` — `createRoot(...).render(<StrictMode><App/></StrictMode>)`
+3. `src/App.jsx` — 전역 상태(테마·언어·결과·히스토리)를 보유하며 화면 결정
+
+## 4. 라우팅 / 화면 전환
+
+React Router 미사용. `App.jsx`의 상태에 따라 로딩 스피너 / 에러 화면 / `ResultView` / `HomeView` 중 하나를 렌더링합니다.
+
+URL 기반 자동 검색 두 가지를 지원합니다.
+
+- **`?url=<음원-링크>`** — 정상 동작합니다. 쿼리스트링 파싱 후 `parse()` 자동 호출.
+- **`/gets/<base64>`** — ⚠ **운영에서 동작하지 않습니다.** GitHub Pages는 정적 호스팅이라 존재하지 않는 경로에 404를 반환하고, `public/`에도 배포된 `gh-pages` 브랜치에도 `404.html`이 없어 React가 부팅조차 못 합니다. 로컬 dev에서 되는 건 Vite 개발 서버가 SPA fallback을 해주기 때문입니다. 경로 방식을 유지하려면 `public/404.html`을 `index.html` 복사본으로 두는 우회가 필요하고, 아니면 이 분기를 삭제하는 게 맞습니다.
+
+> 공유 링크는 **쿼리스트링 방식**이 정적 호스팅에서 확실히 동작합니다.
+
+## 5. 상태 관리
+
+| 위치 | 상태 | 비고 |
+|---|---|---|
+| `useTheme` | `theme`, `isDark` | localStorage 영속화, `<html>`에 `.dark` 토글 |
+| `useLanguage` | `lang`, `t(key)` | localStorage 영속화 (기본 `ko`) |
+| `useParse` | `result`, `loading`, `error` | `/parse` 응답 |
+| `App.jsx` 로컬 | `history` | 최근 검색 최대 10개, 메모리 only |
+
+## 6. 백엔드 연동
+
+**`src/constants/api.js`가 백엔드 주소의 단일 출처입니다.**
+
+```js
+export const API_BASE_URL = import.meta.env.DEV
+    ? 'http://localhost:8000'
+    : 'https://musiknot-api.duckdns.org'
+```
+
+`useParse.js`와 `useMelonMatch.js`가 이 상수를 import합니다. 예전에는 두 훅이 각자 주소를 들고 있었고, 그래서 한쪽이 `localhost` 하드코딩인 채로 드리프트했습니다. 상수를 하나로 모아 그 원인을 제거했습니다.
+
+| Endpoint | Method | 용도 | 호출 위치 |
+|---|---|---|---|
+| `/parse` | POST | 음원 URL → 곡 메타/플랫폼 링크 | `useParse` |
+| `/match` | POST | 제목·아티스트 → 멜론 매칭 | `useMelonMatch` (미사용) |
+
+### ⚠ 백엔드 주소를 바꿀 때
+
+`import.meta.env.DEV`는 Vite가 **빌드 시점에 정적으로 치환**합니다. 프로덕션 빌드에서는 삼항식이 상수 폴딩되어 `localhost` 분기가 번들에서 완전히 사라집니다(`dist` 내 `localhost` 문자열 0건으로 확인됨).
+
+**즉 이 값은 번들에 박힙니다.** 서버만 바꾸고 재배포하지 않으면 사이트는 옛 주소를 계속 호출합니다. 반드시 `npm run deploy`까지 해야 합니다.
+
+CORS는 백엔드의 `allow_origins`에 `https://musiknot.github.io`가 들어 있어서 동작합니다. 백엔드 주소가 바뀌어도 그 목록은 건드리지 않습니다 — CORS 오리진은 *호출하는 쪽*(프론트)이지 *호출받는 쪽*이 아닙니다.
+
+## 7. 컴포넌트 트리 / 그리드 배치
+
+```
+App
+├── Header (테마 / 언어 / 홈 / 메뉴)
+├── HomeView                    # result === null
+│   └── SearchBar
+└── ResultView                  # result !== null
+    └── PlatformGrid
+        ├── 글로벌 5개 (3열 → 3+2 배치)
+        ├── 구분선
+        └── 한국 3개 (3열)
+```
+
+**두 그리드 모두 `grid-cols-3`입니다.** 글로벌은 5개라 3+2로 배치됩니다.
+
+예전에는 글로벌이 `grid-cols-4`였는데, 5개를 4열에 넣으니 Amazon이 모든 화면 폭에서 둘째 줄에 혼자 떨어졌습니다. 게다가 한국 그리드는 3열이라 카드 크기가 37~40% 달랐습니다.
+
+`grid-cols-5`는 실측으로 기각했습니다. 카드 내용물(40px 원 + 8px 여백 + 2줄 라벨 25px)에 **약 75px**이 필요한데, 5열은 320px에서 48px, 414px에서도 66.8px라 어떤 폰에서도 내용물이 넘칩니다. 5열은 뷰포트 445px 이상에서만 성립합니다.
+
+3열 실측치:
+
+| 뷰포트 | 카드 크기 | 두 그리드 일치 | 75px 하한 |
+|---|---|---|---|
+| 320px | 88.0px | ✅ | ✅ |
+| 375px | 106.3px | ✅ | ✅ |
+| 390px | 111.3px | ✅ | ✅ |
+| 512px | 152.0px | ✅ | ✅ |
+
+## 8. 스타일링
+
+- Tailwind CSS v4 유틸리티를 JSX에 직접 사용
+- `src/index.css`에서 `@import "tailwindcss"` + `@variant dark (.dark &)`
+- 다크 모드는 `<html>`의 `.dark` 클래스로 토글 (시스템 설정 반영 옵션 포함)
+- CSS Modules / styled-components 미사용
+
+## 9. 지원 음원 서비스 (`utils/urlValidator.js`)
+
+- 글로벌: Spotify, Apple Music, YouTube / YouTube Music, Amazon Music
+- 한국: Melon, Bugs, FLO
+- 단축 링크: `kko.to` (Kakao), `flomuz.io` (FLO)
+
+화이트리스트에 없는 URL은 검색 단계에서 거부됩니다.
+
+> ⚠ **Spotify와 Amazon은 화이트리스트에 있지만 백엔드가 501을 반환합니다.** 사용자에게는 일반적인 "서버 오류"로 보입니다. 도메인을 빼거나 전용 메시지를 주는 편이 낫습니다.
+
+## 10. 개발 / 배포 명령어
+
+```bash
+npm run dev       # Vite 개발 서버 (http://localhost:5173)
+npm run build     # 프로덕션 빌드 → dist/
+npm run preview   # 빌드 결과 로컬 미리보기
+npm run lint      # ESLint
+npm run deploy    # vite build && gh-pages -d dist  (GitHub Pages 배포)
+```
+
+배포 후 확인:
+
+```bash
+curl -s https://musiknot.github.io/ | grep -o 'assets/index-[A-Za-z0-9_-]*\.js'
+# 새 해시로 바뀌었는지 확인 (반영에 30~60초 걸림)
+```
+
+## 11. 알려진 문제
+
+**`src/components/HomeView.jsx`가 손상돼 있습니다.** 29행에서 잘려 있어 닫는 태그도 `export` 마무리도 없습니다. ESLint가 `Parsing error: Unexpected token`을 냅니다. `pages/HomeView.jsx`에 밀려난 레거시이고 import하는 곳이 없어 빌드는 통과하지만, 누가 이 파일을 다시 쓰는 순간 빌드가 깨집니다. 삭제하는 게 맞습니다.
+
+**`useParse.js`에 mock 잔재가 남아 있습니다.** `mockDB`와 `getMockResponse()`가 통째로 남아 ESLint 미사용 오류를 냅니다. mockDB의 Apple id `1499378615`는 "Blinding Lights"로 적혀 있지만 실제로는 앨범 타이틀곡 "After Hours"입니다(Blinding Lights는 `1488408568`).
+
+**`Header.jsx`가 `theme` prop을 받고 쓰지 않습니다.** 그래서 테마 드롭다운에 현재 선택된 항목 표시가 없습니다.
+
+**`App.jsx`에 `react-hooks/exhaustive-deps` 경고**가 있습니다(`useEffect`의 `handleSearch` 의존성 누락).
+
+**아직 구현되지 않은 UI 요소들** — 의도된 자리표시자입니다.
+- `ResultView.jsx`의 "더 알아보기" 버튼 (Last.fm 연동 예정, 현재 `onClick` 없음)
+- "Powered by Last.fm" 표기 (연동 코드 없음)
+- `Header.jsx` 메뉴의 "이용 방법" / "문의" (배포 시 추가 예정)
+- 홈 부제의 단축 링크(`mus.kn`) 안내 — 도메인 비용 문제로 미구현
+
+**헤더 드롭다운이 바깥 클릭으로 닫히지 않습니다.** `closeAll()`이 항목 선택 시에만 호출되고 document 클릭 리스너가 없습니다.
+
+## 12. 그 밖에
+
+- 모바일에서는 Android `intent://` 스킴으로 네이티브 앱을 직접 열고, 그 외에는 일반 `https://` 링크로 폴백합니다 (`PlatformCard` + `constants/platforms.js`).
+- `platforms.js`에서 YouTube와 YT Music이 같은 색(`#FF0000`)과 같은 이니셜(`Y`)을 씁니다. 카드가 작을 때 10px 라벨로만 구분됩니다.
+- `App.css`, `src/assets/*`는 Vite 템플릿 잔재로 현재 화면에서 사용되지 않습니다.
+- `index.html.bak`는 React 도입 이전의 단일 HTML 스냅샷이며, 같은 맥락의 정적 페이지가 `legacy/`에도 있습니다.
