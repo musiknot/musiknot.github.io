@@ -23,6 +23,22 @@ SEARCH_URL = "https://www.melon.com/search/song/index.htm"
 DETAIL_URL = "https://www.melon.com/song/detail.htm"
 
 
+
+def _full_size_art(src: str | None) -> str | None:
+    """멜론 CDN 이미지 URL 에서 리사이즈 쿼리스트링을 떼어낸다.
+
+    멜론 페이지의 <img src> 는 이런 형태다:
+        .../10047890_500.jpg?<해시>/melon/resize/282/quality/80/optimize
+    쿼리를 그대로 두면 282x282 / 8KB 짜리가 오고, 떼면 500x500 / 141KB 원본이 온다.
+
+    이게 실제로 문제가 되는 곳은 공유 미리보기다. 카카오는 og:image 를 받아
+    800x400 으로 스마트 크롭하는데(해제 옵션 없음), 282px 원본을 800px 로
+    늘리면 뭉개진다. 카카오의 최소 요구치(200x200)는 넘기지만 결과물이 나쁘다.
+    """
+    if not src:
+        return None
+    return src.split("?", 1)[0]
+
 async def search(title: str, artist: str, limit: int = 5) -> list[Track]:
     try:
         async with httpx.AsyncClient(headers=MELON_HEADERS, timeout=5) as client:
@@ -110,7 +126,7 @@ async def _lookup_via_detail(client: httpx.AsyncClient, track_id: str) -> Track 
         title     = title_text,
         artist    = artist_el.get_text(strip=True),
         album     = album_el.get_text(strip=True) if album_el else None,
-        album_art = img_el["src"] if img_el and img_el.get("src") else None,
+        album_art = _full_size_art(img_el.get("src") if img_el else None),
     )
 
 
@@ -150,7 +166,7 @@ async def _lookup_via_search(client: httpx.AsyncClient, track_id: str) -> Track 
             title     = title_el.get_text(strip=True),
             artist    = artist_el.get_text(strip=True) if artist_el else "",
             album     = album_el.get_text(strip=True) if album_el else None,
-            album_art = img_el["src"] if img_el and img_el.get("src") else None,
+            album_art = _full_size_art(img_el.get("src") if img_el else None),
         )
 
     log.info("Melon search-fallback found no match for id=%s", track_id)
