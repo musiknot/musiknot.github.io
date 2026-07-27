@@ -19,9 +19,9 @@
 | Package Mgr | **uv** | `pyproject.toml` + `uv.lock` (lockfile 커밋) |
 | Deploy | **Oracle Cloud** | systemd + Caddy. 10장 참고 |
 
-**선언돼 있지만 코드에서 쓰지 않는 의존성** — `requests`, `ytmusicapi`. 둘 다 import하는 곳이 없습니다(전부 httpx로 이관됨). 정리 대상입니다.
+**제거된 의존성** — `musicbrainzngs`(6장), `requests`·`ytmusicapi`(둘 다 import 0건이었음).
 
-**제거된 의존성** — `musicbrainzngs`. 6장 참고.
+**개발 의존성** — `pytest`. `uv sync --group dev` 로 설치합니다. 운영 서버에는 `uv sync --no-dev` 로 배포하므로 들어가지 않습니다.
 
 ---
 
@@ -32,7 +32,6 @@ backend/
 ├── main.py                   # FastAPI 앱·CORS·라우터 등록·헬스체크
 ├── pyproject.toml            # 의존성 정의 (uv)
 ├── uv.lock                   # 잠금 파일 (커밋 대상)
-├── Procfile                  # ⚠ 버프팩 잔재. VM 배포에서는 무의미 (10장)
 ├── .python-version           # 3.13
 ├── README.md                 # (빈 파일. pyproject의 readme= 가 참조)
 │
@@ -54,8 +53,12 @@ backend/
 │   ├── flo.py                # FLO (JSON API + x-gm-* 헤더)
 │   └── youtube.py            # YouTube Data API v3
 │
-└── utils/
-    └── platform_url.py       # 정규식 → (Platform, track_id)
+├── utils/
+│   └── platform_url.py       # 정규식 → (Platform, track_id)
+│
+└── tests/                    # pytest. 네트워크 없이 0.2초 (tests/README.md 참고)
+    ├── scoring/              # 검증된 41곡 + iTunes 응답 660건 녹화
+    └── test_youtube_pick.py
 ```
 
 `__init__.py`는 모두 빈 파일이지만 *명시적 패키지화*를 위해 존재합니다 (PEP 420 namespace package 회피).
@@ -349,7 +352,7 @@ Railway에서 이전했습니다(무료 체험 만료). 현재 구성:
 - **방화벽이 2계층입니다.** OCI 콘솔에서 80/443을 열어도 Ubuntu 이미지의 iptables INPUT 체인 끝에 catch-all REJECT가 있습니다. `-A`로 추가하면 REJECT *뒤*에 붙어 무효입니다. 반드시 `-I`로 REJECT **앞에** 삽입해야 합니다.
 - **80번도 열어야 합니다.** Let's Encrypt HTTP-01 검증이 80번으로 들어옵니다.
 - **systemd는 `~/.local/bin`을 PATH에 넣지 않습니다.** uv를 홈에 설치하면 서비스가 못 찾습니다. `/usr/local/bin`에 설치했습니다.
-- **`Procfile`은 무의미합니다.** VM에는 버프팩이 없습니다. 게다가 `--host 0.0.0.0`이라 그대로 실행하면 Caddy를 우회해 uvicorn이 노출됩니다. 삭제 대상입니다.
+- **`Procfile`은 삭제했습니다.** VM에는 버프팩이 없어 무의미했고, `--host 0.0.0.0`이라 그대로 실행하면 Caddy를 우회해 uvicorn이 외부에 직접 노출되는 위험이 있었습니다.
 
 ### 배포 절차
 
@@ -395,7 +398,7 @@ Oracle 문서: *"Oracle doesn't charge for Always Free resources after you upgra
 
 **벅스 링크 입력이 404입니다.** `bugs.lookup_by_id`가 모든 id에 대해 `None`을 반환합니다. 서버는 HTTP 200으로 정상 페이지(약 107KB, `<title>` 정상)를 주는데 파싱 셀렉터 4개가 전부 안 맞습니다. 벅스가 HTML 구조를 바꾼 것으로 보입니다. **`bugs.search`는 정상**이라, 다른 플랫폼에서 벅스를 *찾는* 건 됩니다. 벅스 URL이 입력으로 들어오는 경우만 깨져 있습니다.
 
-**YouTube 쿼터가 실질적 상한입니다.** `search.list`는 호출당 100 유닛이고 `/parse` 한 번에 2회 호출(`search_mv` + `search_topic`)합니다. 기본 쿼터 10,000/일 기준으로 **하루 약 50회 파싱**이 한계입니다. 두 호출을 하나로 합치면(Topic 판별은 이미 클라이언트 측에서 함) 두 배가 됩니다.
+**YouTube 쿼터가 실질적 상한입니다.** `search.list`는 호출당 100 유닛이고 기본 쿼터가 10,000/일입니다. `/parse` 한 번이 `search_mv_and_topic()` 으로 **1회만** 호출하므로 **하루 약 100회 파싱**이 한계입니다. (예전에는 MV용·Topic용으로 2회 호출해서 50회였습니다.) 더 늘리려면 캐싱이나 쿼터 증설이 필요합니다.
 
 **멜론이 지원하지 않는 압축을 광고합니다.** `melon.py`가 `Accept-Encoding: gzip, deflate, br`을 보내지만 이 환경의 httpx는 brotli를 디코드할 수 없습니다(brotli 패키지 미설치). 현재는 멜론이 gzip으로 응답해 문제가 없지만, `br`로 응답하면 깨집니다.
 
@@ -409,11 +412,9 @@ Oracle 문서: *"Oracle doesn't charge for Always Free resources after you upgra
 
 ## 13. 향후 개선 후보
 
-- `tests/` 신설 — `extract_platform_id`, `calc_score`, `route_storefronts`처럼 외부 호출 없는 순수 함수부터.
+- 프론트엔드 테스트 — 백엔드는 54개가 생겼지만 프론트는 0개입니다.
 - 벅스 셀렉터 수정.
-- YouTube `search_mv`/`search_topic` 통합 + `regionCode`/`relevanceLanguage` 추가.
 - 아티스트명 로마자 변환 비교(`지드래곤` ↔ `G-DRAGON`).
 - Deezer로 `isrc` 필드 채우기.
 - Spotify 연동 — URL 정규식은 이미 있고 `/parse`에서 501. ISRC를 주고받는 유일한 무료 경로지만, 2026년 2월 정책 변경으로 개발자 본인의 Premium 구독이 필요합니다.
-- 미사용 의존성 정리(`requests`, `ytmusicapi`), `Procfile` 삭제.
 - iTunes 응답 캐싱 — 분당 20회 제한 대비.

@@ -31,7 +31,6 @@ musiknot.github.io/
 │   ├── components/
 │   │   ├── Header.jsx          # 로고, 테마/언어 스위처, 메뉴
 │   │   ├── SearchBar.jsx       # URL 입력 + 클립보드 붙여넣기
-│   │   ├── HomeView.jsx        # ⚠ 파일이 29행에서 잘려 있음 (7장)
 │   │   ├── PlatformGrid.jsx    # 글로벌/한국 두 그리드
 │   │   └── PlatformCard.jsx    # 개별 플랫폼 카드(딥링크 처리)
 │   ├── pages/
@@ -169,13 +168,15 @@ curl -s https://musiknot.github.io/ | grep -o 'assets/index-[A-Za-z0-9_-]*\.js'
 
 ## 11. 알려진 문제
 
-**`src/components/HomeView.jsx`가 손상돼 있습니다.** 29행에서 잘려 있어 닫는 태그도 `export` 마무리도 없습니다. ESLint가 `Parsing error: Unexpected token`을 냅니다. `pages/HomeView.jsx`에 밀려난 레거시이고 import하는 곳이 없어 빌드는 통과하지만, 누가 이 파일을 다시 쓰는 순간 빌드가 깨집니다. 삭제하는 게 맞습니다.
+`npm run lint` 는 현재 **오류 0개**입니다.
 
-**`useParse.js`에 mock 잔재가 남아 있습니다.** `mockDB`와 `getMockResponse()`가 통째로 남아 ESLint 미사용 오류를 냅니다. mockDB의 Apple id `1499378615`는 "Blinding Lights"로 적혀 있지만 실제로는 앨범 타이틀곡 "After Hours"입니다(Blinding Lights는 `1488408568`).
+**⚠️ `useParse` 의 `parse`·`reset` 은 반드시 `useCallback` 으로 감싸져 있어야 합니다.** 이걸 풀면 렌더마다 새 함수가 되고, 이를 의존성으로 쓰는 `App.jsx` 의 `handleSearch` → `useEffect` 가 매 렌더마다 재실행되어 **무한 루프**가 됩니다. 실제로 그렇게 만들었다가 백엔드가 멜론을 초당 수천 번 호출한 적이 있습니다.
 
-**`Header.jsx`가 `theme` prop을 받고 쓰지 않습니다.** 그래서 테마 드롭다운에 현재 선택된 항목 표시가 없습니다.
+방어가 두 겹입니다.
+1. `useParse` 가 `parse`·`reset` 을 메모이제이션합니다 (근본 원인)
+2. `App.jsx` 가 `didAutoSearch` ref 빗장으로 자동 검색을 1회로 못박습니다 — 다른 훅의 참조 안정성에 의존하지 않기 위해서입니다
 
-**`App.jsx`에 `react-hooks/exhaustive-deps` 경고**가 있습니다(`useEffect`의 `handleSearch` 의존성 누락).
+`App.jsx` 의 마운트 effect 는 `react-hooks/set-state-in-effect` 를 의도적으로 끕니다. "URL 이라는 외부 시스템을 읽어 조회를 시작하는 것" 은 effect 의 정당한 용도이고, `queueMicrotask` 로 감싸면 규칙은 통과하지만 코드가 나아지지는 않습니다. 이유를 코드 주석에 남겨뒀습니다.
 
 **아직 구현되지 않은 UI 요소들** — 의도된 자리표시자입니다.
 - `ResultView.jsx`의 "더 알아보기" 버튼 (Last.fm 연동 예정, 현재 `onClick` 없음)

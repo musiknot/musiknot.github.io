@@ -16,8 +16,8 @@
 |---|---|---|---|---|
 | Critical | 3 | 1 | 2 | 0 |
 | High | 5 | 4 | 0 | 1 |
-| Medium | 8 | 6 | 1 | 1 |
-| Low | 7 | 2 | 1 | 4 |
+| Medium | 8 | 7 | 1 | 0 |
+| Low | 7 | 3 | 1 | 3 |
 
 "무효화"는 해당 코드가 삭제되어 문제 자체가 사라진 경우입니다.
 
@@ -74,7 +74,7 @@ MusicBrainz가 빈 후보를 주면 `UnboundLocalError`로 `/parse`가 500이 �
 
 전 서비스가 `httpx.AsyncClient`로 이관됐습니다. `import requests` 0건. `match.py`도 `await melon.search(...)`로 통일됐습니다.
 
-> `pyproject.toml`에 `requests`가 **선언만 남아 있습니다.** 정리 대상.
+> `pyproject.toml`의 `requests` 선언도 제거했습니다.
 
 ### 3.3 `bugs.py` — 잘못된 루프 종료 조건 — ✅ **해결**
 
@@ -88,7 +88,7 @@ GitHub URL로 교체했다가, 파일 자체가 삭제되었습니다.
 
 `services/youtube.py`가 여전히 `log.warning("YOUTUBE_API_KEY not configured")`만 하고 `None`을 반환합니다(35, 68, 102행). 호출자는 "키 누락"인지 "검색 결과 없음"인지 구분할 수 없습니다.
 
-다만 **운영상 더 큰 문제가 따로 있습니다.** `search.list`는 호출당 100 유닛이고 `/parse`가 2회 호출하므로, 기본 쿼터 10,000/일 기준 **하루 약 50회 파싱**이 상한입니다. 키를 넣어도 이 천장이 먼저 옵니다. 두 호출을 하나로 합치면(Topic 판별은 이미 클라이언트 측) 두 배가 됩니다.
+관련해서 제기했던 쿼터 문제는 해결됐습니다. `search.list`가 호출당 100 유닛이고 `/parse`가 2회 호출해 하루 약 50회 파싱이 상한이었는데, `search_mv_and_topic()`으로 통합해 **1회 호출 / 하루 약 100회**가 됐습니다. 다만 키 누락과 검색 실패를 구분하지 못하는 원래 지적은 그대로입니다.
 
 ---
 
@@ -131,11 +131,11 @@ GitHub URL로 교체했다가, 파일 자체가 삭제되었습니다.
 
 `services/youtube.py:126`이 여전히 `if " - " in raw_title: artist, song = raw_title.split(" - ", 1)`입니다. 곡명에 ` - `가 들어가면 깨집니다(예: `Aimer - Re:I am - re-recording`).
 
-`ytmusicapi`가 대안으로 거론됐지만, 조사 결과 현재 `filter='songs'`가 ASCII 대조군을 포함해 모든 질의에 0건을 반환합니다. YouTube가 응답 구조를 바꿨고 라이브러리 파서가 밀린 상태로 보입니다. **비공식 라이브러리 위험의 실물 사례**이므로 지금 도입하면 취약점을 더하는 셈입니다.
+`ytmusicapi`가 대안으로 거론됐지만, 조사 결과 현재 `filter='songs'`가 ASCII 대조군을 포함해 모든 질의에 0건을 반환합니다. YouTube가 응답 구조를 바꿨고 라이브러리 파서가 밀린 상태로 보입니다. **비공식 라이브러리 위험의 실물 사례**이므로 지금 도입하면 취약점을 더하는 셈입니다. 선언만 돼 있고 쓰이지 않던 의존성이라 `pyproject.toml`에서 제거했습니다.
 
-### 4.8 `Procfile` 운영 배포 시 `uv` 가용성 — ✅ **무효화**
+### 4.8 `Procfile` 운영 배포 시 `uv` 가용성 — ✅ **해결(삭제)**
 
-Railway에서 Oracle VM으로 이전하면서 버프팩이 없어졌습니다. `Procfile`은 이제 **무의미할 뿐 아니라 위험합니다** — `--host 0.0.0.0`이라 그대로 실행하면 Caddy를 우회해 uvicorn이 외부에 직접 노출됩니다. 삭제 대상입니다.
+Railway에서 Oracle VM으로 이전하면서 버프팩이 없어져 무의미해졌고, `--host 0.0.0.0`이라 그대로 실행하면 Caddy를 우회해 uvicorn이 외부에 직접 노출되는 위험도 있었습니다. 파일을 삭제했습니다.
 
 ---
 
@@ -145,7 +145,7 @@ Railway에서 Oracle VM으로 이전하면서 버프팩이 없어졌습니다. `
 - `__init__.py` 명시적 추가 — ✅ **해결** (전부 존재하고 git에 커밋됨)
 - CORS `allow_origins` 환경변수화 — ⚠️ 미해결. `main.py`에 여전히 하드코딩. 다만 실제 필요성은 낮습니다. 이 목록은 *프론트엔드 주소*이고 그건 GitHub Pages에 고정돼 있어서, 백엔드를 옮겨도 바뀌지 않습니다.
 - `requirements.txt` 제거 — ✅ **해결** (uv로 완전 이관)
-- `tests/` 폴더 부재 — ⚠️ 미해결. 지금은 더 중요해졌습니다. `route_storefronts`, `calc_score`, `qualifiers`, `extract_platform_id` 모두 외부 호출이 없는 순수 함수라 테스트하기 쉽고, 스코어링 로직이 복잡해진 만큼 회귀 위험이 커졌습니다.
+- `tests/` 폴더 부재 — ✅ **해결**. `backend/tests/` 에 54개. 검증된 41곡을 녹화된 iTunes 응답 660건 위에서 **실제 `itunes.py`·`scoring.py`에** 태워 채점합니다. 네트워크 없이 0.2초. 회귀를 실제로 잡는지도 확인했습니다 — `route_storefronts`를 옛 동작으로 되돌리면 41/41이 10/41로 떨어집니다. 다만 벤치가 포화라 임계값은 반증하지 못합니다(`backend/tests/README.md`).
 - 외부 API retry/backoff — ⚠️ 미해결. iTunes가 분당 약 20회 제한에 429 + `retry-after` 19~29초를 반환하는 게 확인됐으므로 실질적 필요가 생겼습니다.
 - sync 라이브러리 캐싱 — ✅ **무효화** (MusicBrainz 삭제)
 
@@ -197,10 +197,10 @@ bugs.lookup_by_id("5812157")  → None
 | ~~P2~~ | ~~죽은 파일 정리~~ | ✅ 해결 |
 | ~~P2~~ | ~~`print` → `logging`~~ | ✅ 해결 |
 | **P1** | **벅스 셀렉터 수정** (6.1) | 🔴 미해결 |
-| **P1** | **YouTube 2회 호출 → 1회 통합** (3.5) | 🔴 미해결 |
-| P2 | `tests/` 신설 — 순수 함수부터 | 미해결 |
+| ~~P1~~ | ~~YouTube 2회 호출 → 1회 통합~~ | ✅ 해결 (하루 50 → 100 파싱) |
+| ~~P2~~ | ~~`tests/` 신설~~ | ✅ 해결 (54개, 네트워크 없이 0.2초) |
 | P2 | iTunes 429 대비 retry/backoff + 캐시 | 미해결 |
-| P2 | `Procfile` 삭제, 미사용 의존성 정리 | 미해결 |
+| ~~P2~~ | ~~`Procfile` 삭제, 미사용 의존성 정리~~ | ✅ 해결 |
 | P3 | YouTube 제목 파싱 개선 (4.7) | 미해결 |
 | P3 | 아티스트명 로마자 변환 비교 (6.3) | 미해결 |
 | P3 | `melon.py` Accept-Encoding 정정 (6.2) | 미해결 |
