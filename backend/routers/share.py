@@ -18,6 +18,7 @@
 import html
 import json
 import logging
+from urllib.parse import quote
 
 from fastapi import APIRouter
 from fastapi.responses import HTMLResponse
@@ -30,11 +31,13 @@ log    = logging.getLogger(__name__)
 router = APIRouter()
 
 FRONTEND_ORIGIN = "https://musiknot.github.io"
+# og:url 은 반드시 절대 URL 이어야 한다. 상대 경로를 주면 크롤러가 정규 URL을
+# 잡지 못한다.
+SHARE_ORIGIN    = "https://musiknot-api.duckdns.org"
 
 # 리다이렉트 대상은 **상수**다. share_id 는 여기에 끼어들 수 없다.
 # (열린 리다이렉트 방지 — 목적지가 입력에 의해 바뀌지 않는다.)
 def _frontend_url(share_id: str) -> str:
-    from urllib.parse import quote
     return f"{FRONTEND_ORIGIN}/?id={quote(share_id, safe='')}"
 
 
@@ -93,7 +96,7 @@ def _page(*, title: str, description: str, image: str | None,
 @router.get("/s/{share_id}", response_class=HTMLResponse)
 async def share(share_id: str):
     """`melon:30314784` 같은 공유 ID 를 미리보기 카드가 달린 페이지로."""
-    canonical = f"/s/{share_id}"
+    canonical = f"{SHARE_ORIGIN}/s/{quote(share_id, safe=':')}"
     parsed    = parse_share_id(share_id)
 
     # ID 가 잘못됐어도 사람은 어딘가 도착해야 한다. 홈으로 보낸다.
