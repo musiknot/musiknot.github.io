@@ -50,15 +50,16 @@ backend/
 │   ├── url_resolver.py       # 단축 URL 해제
 │   ├── itunes.py             # Apple Music (스토어프론트 라우팅)
 │   ├── melon.py              # 멜론 (BS4)
-│   ├── bugs.py               # 벅스 (BS4)  ⚠ lookup_by_id 깨져 있음 (12장)
+│   ├── bugs.py               # 벅스 (BS4 + sc:* 메타)
 │   ├── flo.py                # FLO (JSON API + x-gm-* 헤더)
 │   └── youtube.py            # YouTube Data API v3
 │
 ├── utils/
 │   └── platform_url.py       # 정규식 → (Platform, track_id) + 공유 ID 빌드/파싱
 │
-└── tests/                    # pytest 98개. 네트워크 없이 0.2초 (tests/README.md 참고)
+└── tests/                    # pytest 115개. 네트워크 없이 0.7초 (tests/README.md 참고)
     ├── scoring/              # 검증된 41곡 + iTunes 응답 660건 녹화
+    ├── test_bugs.py          # 벅스 파싱 회귀 (+ bugs_fixtures/ 녹화 페이지)
     ├── test_share.py         # 공유 ID 왕복 + OG 페이지 이스케이프
     ├── test_youtube_pick.py
     └── test_platform_contract.py   # ⚠ 프론트 src/constants/platforms.js 를 읽는다
@@ -279,7 +280,7 @@ async def lookup_by_id(track_id: str) -> Track | None
 | `url_resolver.py` | kko.to / flomuz.io | httpx redirect | FLO share는 HTML에서 `/detail/track/(\d+)` 추출 |
 | `itunes.py` | Apple Music | REST | **스토어프론트 라우팅**. 아래 참고 |
 | `melon.py` | Melon | BS4 스크래핑 | 메인 페이지 사전 방문으로 쿠키 확보, detail → 검색 폴백 |
-| `bugs.py` | Bugs | BS4 스크래핑 | ⚠ `lookup_by_id` 깨짐 (12장) |
+| `bugs.py` | Bugs | BS4 스크래핑 | 곡정보 표 + `sc:*` 메타 |
 | `flo.py` | FLO | 내부 JSON API | `x-gm-*` 헤더, `imgList[size==500]` |
 | `youtube.py` | YouTube | Data API v3 | MV → Topic → fallback. ⚠ 쿼터 한계 (12장) |
 
@@ -312,6 +313,35 @@ async with httpx.AsyncClient(headers=MELON_HEADERS, timeout=10) as client:
 
 - Chrome UA 위장 + `Referer: https://www.melon.com`.
 - **쿠키 워밍업은 요청 간에 유지되지 않습니다.** `AsyncClient`가 함수 스코프라 반환 시 쿠키 저장소가 파기됩니다. 즉 이 워밍업은 *같은 요청 내* 상세 조회에만 효과가 있습니다. IP 고정 여부와는 무관합니다.
+
+### 7.3 벅스 — 무엇을 믿고 무엇을 안 믿는가
+
+한동안 벅스 링크 입력이 전부 404였습니다. 페이지는 HTTP 200인데 셀렉터 4개 중 3개가 사라진 DOM을 가리켰고, 남은 하나(`p.artist a`)는 **곡 정보가 아니라 페이지 아래쪽 뮤직비디오 목록**의 아티스트 라벨을 잡고 있었습니다. 뮤비 아티스트가 곡 아티스트와 같아서 값이 맞아떨어졌을 뿐입니다.
+
+지금은 필드마다 다른 근거를 씁니다.
+
+| 필드 | 1순위 | 폴백 | 왜 |
+|---|---|---|---|
+| 제목 | `<meta property="sc:track_title">` | `header.pgTitle h1` | 벅스가 공유 카드용으로 박아두는 값. 페이지에 `h1`이 9~13개라 순진한 `h1` 폴백은 '안내'를 집습니다 |
+| 아티스트 | 곡정보 표 `<th>아티스트</th>` 행의 첫 `/artist/` 링크 | `sc:artist_nm` (경고 로그와 함께) | 협연곡에서 `sc:artist_nm`은 대표가 아니라 **앨범 크레딧**을 줍니다 — `Golden`이 `HUNTR/X`가 아니라 `KPop Demon Hunters Cast`가 됩니다 |
+| 앨범 | `sc:album_title` | 표 `<th>앨범</th>` 행 | '앨범' 행은 '참여 정보' 유무에 따라 2번째/3번째로 밀려서 위치로는 못 찾습니다 |
+| 앨범아트 | `og:image` | 없음 | 이미 500px이고 캐시버스터 쿼리가 없습니다. 본문 이미지는 200px에 `?version=`이 붙습니다 |
+
+**`og:title`은 폴백으로도 쓰지 않습니다.** 벅스는 없는 곡을 404가 아니라 **302로 `/noMusic`** 에 보내고, 그 페이지는 200에 `og:title='나를 위한 플리, 벅스'`와 벅스 로고 이미지를 달고 옵니다. 그래서 방어가 두 겹입니다 — 리다이렉트를 **따라가지 않는 것**(302에서 `raise_for_status`가 걸립니다)이 1차, `og:title`을 안 믿는 것이 2차입니다. `follow_redirects=True`를 켜는 순간 삭제된 곡이 그럴듯한 가짜 Track이 됩니다.
+
+앨범아트에는 경로 가드(`image.bugsm.co.kr/album/images/`)가 있습니다. 없으면 커버가 없는 곡에 벅스 로고가 앨범 아트인 척 박힙니다.
+
+**아티스트 셀은 세 가지 모양입니다** (검색 결과 400행 실측).
+
+| 모양 | 건수 |
+|---|---|
+| `<a href=".../artist/123" title="…">` 하나 | 373 |
+| 위 + `<a class="more" title="아티스트 전체보기">` (협연) | 13 |
+| `<a>` 없는 평문 — `Unknown`·`Various Artists`·`Cover Artist` | 27 |
+
+그래서 앵커는 클래스가 아니라 **`a[href*="/artist/"]`** 입니다 — `a[title]`로 잡으면 '아티스트 전체보기' 버튼 라벨이 아티스트 이름으로 섞입니다. 세 번째 부류는 `search()`가 **조용히 버리고 있었고**, 그 탓에 OST·컴필레이션 곡이 벅스에서 통째로 사라졌습니다. 곡을 버릴지는 파서가 아니라 스코어러가 정할 일입니다.
+
+> **알려진 불일치**: `search()`는 아티스트명의 괄호 병기를 떼고(`The Weeknd(위켄드)` → `The Weeknd`), `lookup_by_id()`는 남깁니다. 같은 곡이 들어온 경로에 따라 다른 문자열을 갖습니다. 어느 쪽으로 통일하든 `calc_score` 결과가 달라지는 **매칭 정책** 문제라 일부러 손대지 않았고, `test_bugs.py`가 이 사실을 고정해 두고 있습니다.
 
 ---
 
@@ -360,7 +390,7 @@ uv run uvicorn main:app --reload      # http://localhost:8000
 ```bash
 cd backend
 uv sync --group dev
-uv run pytest -q          # 98개, 네트워크 없이 0.2초
+uv run pytest -q          # 115개, 네트워크 없이 0.7초
 ```
 
 무엇을 왜 지키는지는 [`tests/README.md`](backend/tests/README.md) 에 있습니다. 여기서는 두 가지만 짚습니다.
@@ -441,7 +471,7 @@ Oracle 문서: *"Oracle doesn't charge for Always Free resources after you upgra
 
 ## 12. 알려진 문제
 
-**벅스 링크 입력이 404입니다.** `bugs.lookup_by_id`가 모든 id에 대해 `None`을 반환합니다. 서버는 HTTP 200으로 정상 페이지(약 107KB, `<title>` 정상)를 주는데 파싱 셀렉터 4개가 전부 안 맞습니다. 벅스가 HTML 구조를 바꾼 것으로 보입니다. **`bugs.search`는 정상**이라, 다른 플랫폼에서 벅스를 *찾는* 건 됩니다. 벅스 URL이 입력으로 들어오는 경우만 깨져 있습니다.
+**~~벅스 링크 입력이 404입니다.~~** 고쳤습니다 — 7장의 `bugs.py` 항목과 `tests/test_bugs.py` 참고.
 
 **YouTube 쿼터가 실질적 상한입니다.** `search.list`는 호출당 100 유닛이고 기본 쿼터가 10,000/일입니다. `/parse` 한 번이 `search_mv_and_topic()` 으로 **1회만** 호출하므로 **하루 약 100회 파싱**이 한계입니다. (예전에는 MV용·Topic용으로 2회 호출해서 50회였습니다.) 더 늘리려면 캐싱이나 쿼터 증설이 필요합니다.
 
@@ -458,7 +488,6 @@ Oracle 문서: *"Oracle doesn't charge for Always Free resources after you upgra
 ## 13. 향후 개선 후보
 
 - 매칭 벤치마크 확장 — 현재 41곡은 포화 상태라 채점 임계값을 반증하지 못합니다. 비어 있는 케이스는 `tests/README.md` 참고.
-- 벅스 셀렉터 수정.
 - 아티스트명 로마자 변환 비교(`지드래곤` ↔ `G-DRAGON`).
 - Deezer로 `isrc` 필드 채우기.
 - Spotify 연동 — URL 정규식은 이미 있고 `/parse`에서 501. ISRC를 주고받는 유일한 무료 경로지만, 2026년 2월 정책 변경으로 개발자 본인의 Premium 구독이 필요합니다.

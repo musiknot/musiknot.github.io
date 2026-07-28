@@ -129,7 +129,7 @@ npm run dev                              # http://localhost:5173
 ## 테스트
 
 ```bash
-cd backend && uv run pytest -q   # 98개
+cd backend && uv run pytest -q   # 115개
 npm test                         # 16개
 ```
 
@@ -144,7 +144,7 @@ npm test                         # 16개
 | Apple Music | ✅ | ✅ |
 | Melon | ✅ | ✅ |
 | FLO | ✅ | ✅ |
-| Bugs | ⚠️ HTML 구조 변경으로 파싱 실패 | ✅ |
+| Bugs | ✅ | ✅ |
 | YouTube / YT Music | ✅ | ✅ |
 | Spotify / Amazon | ❌ 미연동 | ❌ |
 
@@ -160,5 +160,5 @@ Spotify는 2026년 2월 정책 변경으로 개발자 본인의 Premium 구독�
 
 - **문자체계가 다른 아티스트명은 기권합니다.** `지드래곤` vs `G-DRAGON`처럼 Apple이 라틴 문자로 표기하는 경우 매칭하지 못합니다. 틀린 링크를 주느니 비우는 쪽을 택했습니다.
 - **중국어는 일본 스토어프론트로 갑니다.** 한자만으로는 둘을 구분할 수 없습니다.
-- **테스트는 백엔드 98개 / 프론트 16개**입니다 ([`backend/tests/`](backend/tests/README.md)). 다만 백엔드의 41곡 매칭 벤치마크는 **포화 상태**라 채점 임계값을 반증하지 못합니다.
+- **테스트는 백엔드 115개 / 프론트 16개**입니다 ([`backend/tests/`](backend/tests/README.md)). 다만 백엔드의 41곡 매칭 벤치마크는 **포화 상태**라 채점 임계값을 반증하지 못합니다.
 - ISRC 필드는 스키마에 있으나 항상 `null`입니다. 연동된 7개 플랫폼 중 ISRC를 내보내는 곳이 하나도 없어서, ISRC로는 매칭을 시작할 수 없습니다.
