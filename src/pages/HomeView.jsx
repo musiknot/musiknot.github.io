@@ -1,5 +1,6 @@
 import { Clock, Trash2 } from 'lucide-react'
 import { SearchBar } from '../components/SearchBar'
+import { InstallCard } from '../components/InstallCard'
 
 export function HomeView({ onSearch, history, onHistoryClick, onClearHistory, t }) {
     return (
@@ -19,12 +20,8 @@ export function HomeView({ onSearch, history, onHistoryClick, onClearHistory, t 
                 </p>
             </div>
 
-            {/* 모바일 안내 */}
-            <div className="bg-white/80 dark:bg-zinc-900/80 border border-gray-200 dark:border-zinc-800 p-5 rounded-2xl backdrop-blur-sm w-full max-w-md shadow-sm">
-                <p className="text-xs text-gray-700 dark:text-zinc-200 text-center font-bold leading-snug">
-                    {t('mobileNotice')}
-                </p>
-            </div>
+            {/* 설치 / 모바일 안내 — 환경에 따라 내용이 달라진다 */}
+            <InstallCard t={t} />
 
             {/* 검색창 + 히스토리 */}
             <div className="w-full max-w-2xl space-y-8">

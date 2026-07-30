@@ -68,6 +68,21 @@ describe('마운트 시 자동 검색', () => {
         expect(fetchMock).toHaveBeenCalledTimes(1)
     })
 
+    it('공유 시트가 text 에 제목과 링크를 섞어 보내도 1회', async () => {
+        // 설치된 PWA 로 공유하면 여기로 들어온다. 안드로이드 앱들은 링크를
+        // url 이 아니라 text 에 담아 보내는 경우가 많다.
+        const fetchMock = mockFetch()
+        setUrl('?text=' + encodeURIComponent(
+            '밤편지 https://www.melon.com/song/detail.htm?songId=30314784'))
+
+        render(<App />)
+
+        await waitFor(() => expect(screen.getByRole('heading', { name: '밤편지' })).toBeInTheDocument())
+        expect(fetchMock).toHaveBeenCalledTimes(1)
+        expect(JSON.parse(fetchMock.mock.calls[0][1].body))
+            .toEqual({ url: 'https://www.melon.com/song/detail.htm?songId=30314784' })
+    })
+
     it('파라미터가 없으면 아무 요청도 하지 않는다', async () => {
         const fetchMock = mockFetch()
         setUrl('')

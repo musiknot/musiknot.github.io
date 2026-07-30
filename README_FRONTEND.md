@@ -21,7 +21,8 @@
 
 ```
 musiknot.github.io/
-├── index.html              # 엔트리 HTML, <div id="root"> + main.jsx
+├── index.html              # 엔트리 HTML — 매니페스트·apple-touch-icon 링크
+├── public/                 # 매니페스트 + PWA 아이콘 (빌드 시 dist 루트로 복사)
 ├── vite.config.js          # React + Tailwind 플러그인, base: '/'
 ├── src/
 │   ├── main.jsx            # createRoot(StrictMode)
@@ -31,22 +32,30 @@ musiknot.github.io/
 │   ├── components/
 │   │   ├── Header.jsx          # 로고, 테마/언어 스위처, 메뉴
 │   │   ├── SearchBar.jsx       # URL 입력 + 클립보드 붙여넣기
+│   │   ├── InstallCard.jsx     # 홈 안내 카드 — 설치/iOS/데스크톱 3분기
+│   │   ├── ShareWidget.jsx     # 결과 공유 (복사·시트·QR)
+│   │   ├── QrCode.jsx          # uqr → SVG 직접 렌더
 │   │   ├── PlatformGrid.jsx    # 글로벌/한국 두 그리드
 │   │   └── PlatformCard.jsx    # 개별 플랫폼 카드(딥링크 처리)
 │   ├── pages/
 │   │   ├── HomeView.jsx        # 실제 사용되는 검색 화면
-│   │   └── ResultView.jsx      # 곡 상세 화면
+│   │   ├── ResultView.jsx      # 곡 상세 화면
+│   │   └── ShareLogView.jsx    # ?sharelog=1 — 공유 원본 파라미터 수집용
 │   ├── hooks/
 │   │   ├── useTheme.js         # light/dark/system + localStorage
 │   │   ├── useLanguage.js      # ko/en i18n + t() 헬퍼
 │   │   ├── useParse.js         # /parse 호출
+│   │   ├── useInstall.js       # 설치 가능 여부 / OS / 설치 실행
 │   │   └── useMelonMatch.js    # /match 호출 — 현재 미사용 (7장)
 │   ├── constants/
 │   │   ├── api.js              # ★ 백엔드 베이스 URL (단일 출처)
 │   │   ├── translations.js     # ko/en 문자열
 │   │   └── platforms.js        # 플랫폼 메타데이터 + 딥링크 빌더
 │   ├── utils/
-│   │   └── urlValidator.js     # 지원 음원 서비스 URL 화이트리스트
+│   │   ├── urlValidator.js     # 지원 음원 서비스 URL 화이트리스트
+│   │   ├── shareTarget.js      # 공유 파라미터에서 링크 추출
+│   │   ├── shareLog.js         # 공유 원본 기록 (기기 안에만)
+│   │   └── installPrompt.js    # beforeinstallprompt 포착 (React 보다 먼저)
 │   └── assets/                 # 미사용 placeholder
 ├── legacy/                 # 구버전 정적 페이지 보관
 └── backend/                # FastAPI 백엔드 (README_BACKEND.md 참고)
@@ -69,7 +78,41 @@ URL 기반 자동 검색 두 가지를 지원합니다.
 
 - **`?id=<플랫폼:트랙ID>`** — 공유 링크. `?id=melon:30314784` 형태로, `useParse` 의 `parseById` 가 백엔드에 ID 를 그대로 넘깁니다. URL 이 아니므로 `validateUrl` 을 거치지 않고, 형식 검증은 백엔드가 합니다(플랫폼 화이트리스트 + 문자·길이 제한).
 
+- **`?text=` / `?title=`** — 공유 시트에서 들어오는 경로(아래 PWA 절). `?url=` 과 함께 `extractSharedUrl` 이 세 칸을 훑습니다.
+
+- **`?sharelog=1`** — 공유로 들어온 원본 파라미터를 보여주는 수집용 화면.
+
 > 공유 링크는 **쿼리스트링 방식**이 정적 호스팅에서 확실히 동작합니다.
+
+### PWA / 공유 타깃 — 링크를 앱 **안으로** 들여오기
+
+`ShareWidget` 이 결과를 밖으로 내보내는 쪽이라면, 이쪽은 반대 방향입니다. 설치하면 멜론·유튜브뮤직의 공유 메뉴에 Musiknot 이 떠서, **음악앱 → 복사 → 브라우저 → 붙여넣기** 과정이 없어집니다.
+
+| 파일 | 역할 |
+|---|---|
+| `public/manifest.webmanifest` | 매니페스트 + `share_target` |
+| `utils/installPrompt.js` | `beforeinstallprompt` 포착, OS 판정 |
+| `hooks/useInstall.js` | 카드가 쓸 상태 |
+| `components/InstallCard.jsx` | 홈 화면 안내 (3분기) |
+| `utils/shareTarget.js` | 들어온 파라미터에서 링크 추출 |
+| `src/manifest.test.js` | 매니페스트가 설치 가능한 상태인지 고정 |
+
+**서비스 워커는 넣지 않았습니다.** 예전에는 설치 필수 조건이었지만 Chromium 151 stable 의 설치 판정 코드(`installable_evaluator.cc`, `app_banner_manager.cc`)에는 검사 자체가 없고 관련 오류 코드(`NO_MATCHING_SERVICE_WORKER`, `NOT_OFFLINE_CAPABLE` 등)가 전부 `DEPRECATED` 입니다. 이 앱은 백엔드 없이는 아무것도 못 하므로 오프라인 셸이 줄 것도 없습니다. 반면 서비스 워커는 한번 배포하면 사용자 기기에 남아 회수가 어렵습니다. 얻는 것 없이 부채만 지는 거래라 뺐습니다.
+
+**`action` 은 반드시 `/` 입니다.** 두 가지 이유가 겹칩니다.
+
+- `"/share"` 같은 경로는 정적 호스팅에서 404 라 React 가 부팅조차 못 합니다 — `/gets/` 가 이미 그렇게 죽어 있습니다.
+- `"/?share=1"` 처럼 표식을 심는 것도 안 됩니다. **명세상 GET 이면 `action` 의 쿼리는 공유 데이터로 통째로 덮어써집니다.** 공유 진입 판별은 "어떤 이름의 파라미터가 왔는가" 로만 해야 합니다.
+
+**링크가 어느 칸에 오는지는 정해져 있지 않습니다.** 안드로이드 인텐트에는 URL 전용 칸이 없어서(`EXTRA_TEXT` 만 있음) 링크는 대개 `text` 에, 제목과 섞여서 옵니다. 그래서 `extractSharedUrl` 이 `url` → `text` → `title` 순으로 훑고 **지원 도메인을 우선** 고릅니다. 공유 문구에 앱스토어 링크가 같이 붙어 오는 일이 있어서 먼저 나온 URL 을 집으면 엉뚱한 걸 잡습니다.
+
+지원 도메인이 하나도 없으면 그래도 찾은 첫 URL 을 넘깁니다 — 조용히 아무 일도 안 일어나는 것보다 앱이 평소의 "지원하지 않는 링크" 를 말해 주는 편이 낫습니다.
+
+**앱별로 무엇이 오는지는 실측 중입니다.** 문서화될 성질의 정보가 아니라(각 앱의 구현 세부사항) 1차 출처가 없습니다. 그래서 공유 진입 시 원본 파라미터를 기기에 기록하고(`utils/shareLog.js`, 최근 20건) `?sharelog=1` 에서 확인합니다. 기록은 기기 밖으로 나가지 않습니다.
+
+**iOS 는 공유 시트에 들어갈 수 없습니다.** WebKit 의 Web Share Target 이슈(#194593)는 2019년에 열려 지금도 미배정 상태이고, Safari 27 에도 없습니다. 그래서 iOS 카드는 **"홈 화면에 추가" 까지만 약속합니다.** 공유 메뉴를 약속하면 거짓말이 됩니다 — `InstallCard.test.jsx` 가 그 문구가 iOS 분기에 새어 들어오지 않는지 검사합니다. (참고로 `navigator.share` 는 iOS 에서 동작합니다. 내보내는 Web Share API 와 받는 Web Share **Target** 은 다른 API 입니다.)
+
+> ⚠️ 안드로이드에서 공유 시트 등록은 **WebAPK 설치**에 달려 있습니다. 설치가 WebAPK 가 아니라 단순 바로가기로 떨어지면 홈 화면 아이콘은 생겨도 공유 메뉴에는 나타나지 않습니다.
 
 ### 공유 위젯 (`components/ShareWidget.jsx`)
 
@@ -204,7 +247,7 @@ curl -s https://musiknot.github.io/ | grep -o 'assets/index-[A-Za-z0-9_-]*\.js'
 ## 11. 테스트
 
 ```bash
-npm test    # 16개, 네트워크 없이 실행
+npm test    # 52개, 네트워크 없이 실행
 ```
 
 `vitest` + `@testing-library/react` + `jsdom`. 설정은 `vite.config.js` 의 `test` 블록, 공통 준비는 `src/test/setup.js` 입니다.
@@ -216,6 +259,9 @@ npm test    # 16개, 네트워크 없이 실행
 | `hooks/useParse.test.jsx` | `parse`·`reset`·`parseById` 의 **참조가 유지**되는가 (무한 루프의 근본 원인) |
 | `App.test.jsx` | `?id=` / `?url=` 진입 시 요청이 **정확히 1회**인가 (StrictMode 이중 실행 포함) |
 | `components/ShareWidget.test.jsx` | `navigator.share` 가 없을 때 버튼을 **렌더하지 않는가**, 클립보드 실패 폴백, QR 열기/닫기 |
+| `components/InstallCard.test.jsx` | 분기마다 **약속하는 내용이 다르다** — iOS 에 공유 메뉴를 약속하지 않는가, 이미 설치했는데 또 설치하라고 하지 않는가 |
+| `utils/shareTarget.test.js` | 링크가 `url`·`text`·`title` 중 어디로 와도 찾아내는가, 여러 개 중 지원 도메인을 고르는가 |
+| `manifest.test.js` | 매니페스트가 **설치 가능한 상태로** 남아 있는가 (깨지면 공유 시트에서 조용히 사라진다) |
 
 요청 횟수를 세는 이유는 성능이 아니라 **안전**입니다. `/parse` 한 번이 백엔드에서 외부 호출 약 7건이 되고 거기에 멜론·벅스·FLO 스크래핑이 포함되는데, 그쪽에서 IP 가 차단당하는 것은 이 시스템에서 유일하게 되돌릴 수 없는 실패입니다. 아래 12절의 사고가 바로 그것이었습니다.
 

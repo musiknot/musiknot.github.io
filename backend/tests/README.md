@@ -16,7 +16,7 @@ uv run pytest -q
 | `test_youtube_pick.py` | 10 |
 | `test_platform_contract.py` | 5 |
 
-프론트엔드 테스트는 저장소 루트에서 `npm test` 로 돕니다 (16개, `README_FRONTEND.md` 11절).
+프론트엔드 테스트는 저장소 루트에서 `npm test` 로 돕니다 (52개, `README_FRONTEND.md` 11절).
 
 ## 무엇을 지키고 있나
 

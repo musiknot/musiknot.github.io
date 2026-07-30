@@ -2,9 +2,19 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { useTheme } from './hooks/useTheme'
 import { useLanguage } from './hooks/useLanguage'
 import { useParse } from './hooks/useParse'
+import { extractSharedUrl } from './utils/shareTarget'
+import { recordShare } from './utils/shareLog'
 import { Header } from './components/Header'
 import { HomeView } from './pages/HomeView'
 import { ResultView } from './pages/ResultView'
+import { ShareLogView } from './pages/ShareLogView'
+
+// 공유 수집 화면은 주소로만 들어간다. 마운트 시 한 번 읽으면 되는 값이라
+// 상태로 들고 있을 이유가 없다 — 이 앱에는 라우터가 없어서 주소가 바뀌면
+// 어차피 전체가 새로 뜬다.
+const showShareLog =
+    typeof window !== 'undefined' &&
+    new URLSearchParams(window.location.search).get('sharelog') === '1'
 
 export default function App() {
     const { theme, setTheme, isDark }   = useTheme()
@@ -61,10 +71,27 @@ export default function App() {
             return
         }
 
-        // ?url= 원본 음원 링크 — 붙여넣기 경로
-        const urlParam = params.get('url')
-        if (urlParam) {
-            handleSearch(urlParam)
+        // ?url= 원본 음원 링크 — 붙여넣기 경로이자 공유 시트 경로다.
+        //
+        // 설치된 PWA 는 공유 타깃으로 등록되어 여기로 들어온다. 그런데 보내는
+        // 앱이 링크를 url/text/title 중 어디에 담을지는 정해져 있지 않아서,
+        // 세 칸을 다 뒤져야 한다. 자세한 이유는 extractSharedUrl 주석 참고.
+        const raw = {
+            url:   params.get('url'),
+            text:  params.get('text'),
+            title: params.get('title'),
+        }
+        const shared = extractSharedUrl(raw)
+
+        // 공유 시트에서 들어온 경우에만 원본을 남긴다. 앱마다 링크를 어느 칸에
+        // 담는지 문서로는 알 수 없어서 실기기에서 모으는 중이다 (?sharelog=1).
+        // ?url= 만 있는 건 우리가 만든 링크라 기록할 게 없다.
+        if (raw.text || raw.title) {
+            recordShare(raw, shared)
+        }
+
+        if (shared) {
+            handleSearch(shared)
             return
         }
 
@@ -143,7 +170,9 @@ export default function App() {
             )}
 
             {/* 뷰 전환 */}
-            {!loading && !error && (
+            {showShareLog ? (
+                <ShareLogView />
+            ) : !loading && !error && (
                 result ? (
                     <ResultView
                         song={result}
