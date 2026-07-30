@@ -72,6 +72,45 @@ describe('extractSharedUrl — 끝에 붙은 문장부호', () => {
     })
 })
 
+describe('iOS 단축어와의 계약', () => {
+    /**
+     * 단축어는 **저장소 밖에 있다.** iCloud 에 서명돼 올라가 있어서 버전 관리가
+     * 안 되고, 내용이 바뀌어도 여기서는 알 수 없다. 그래서 그 출력 형식을
+     * 여기에 고정해 둔다.
+     *
+     * 실제 단축어(iCloud 0d61d3b3…, "Musiknot로 공유")가 하는 일은 3단계다:
+     *   1. 공유 시트 입력을 URL 인코딩
+     *   2. `https://musiknot.github.io/?text=` + 인코딩 결과
+     *   3. 그 URL 을 공유
+     *
+     * **`?url=` 이 아니라 `?text=` 로 온다.** 단축어가 입력에서 링크만
+     * 뽑아내지 않고 통째로 넘기기 때문이다 — 그래서 제목이 섞여 들어온다.
+     * 이 파일 위쪽 테스트들이 다루는 바로 그 상황이다.
+     */
+    const asShortcutWould = (sharedInput) =>
+        'https://musiknot.github.io/?text=' + encodeURIComponent(sharedInput)
+
+    const read = (built) => {
+        const params = new URLSearchParams(new URL(built).search)
+        return extractSharedUrl({
+            url: params.get('url'), text: params.get('text'), title: params.get('title'),
+        })
+    }
+
+    it.each([
+        ['순수 URL',   MELON],
+        ['제목이 섞임', `밤편지 - 아이유 ${MELON}`],
+        ['단축 링크',   KKO],
+        ['줄바꿈 포함', `[Melon] 아이유 - 밤편지\n${KKO}`],
+        ['벅스',       'https://music.bugs.co.kr/track/30598121'],
+        ['유튜브뮤직',  'https://music.youtube.com/watch?v=BzYnNdJhZQw'],
+    ])('%s 를 공유해도 링크를 복원한다', (_, sharedInput) => {
+        const picked = read(asShortcutWould(sharedInput))
+        expect(picked).toMatch(/^https?:\/\//)
+        expect(sharedInput).toContain(picked)   // 원본에 있던 그 링크여야 한다
+    })
+})
+
 describe('extractSharedUrl — 아무것도 없을 때', () => {
     it.each([
         ['빈 객체',        {}],

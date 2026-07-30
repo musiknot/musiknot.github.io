@@ -20,6 +20,17 @@ LOOKUP_URL = "https://itunes.apple.com/lookup"
 # (예: '너를 만나'/폴킴은 같은 아티스트의 다른 곡 뒤 2위에 온다).
 SCAN_LIMIT = 5
 
+# iTunes는 분당 약 20회에서 429와 Retry-After(실측 19~29초)를 돌려준다.
+# **기다렸다 재시도하지 않는다.** 한때 그렇게 했다가 더 나빠졌다 — 429일 때
+# _get 이 빈 리스트를 돌려주면 search() 의 조기 반환 조건이 성립하지 않아
+# 스토어프론트를 전부 돌고, 그래서 대기가 곱해진다. 한국어 곡이면
+# search() 한 번이 29초씩 두 번, /parse 는 search 를 두 번 부르니 116초.
+# 40초 데드라인에 걸려 504 가 됐다. 그 전에는 같은 상황에서
+# appleMusic 만 비우고 200 을 냈다. 즉 재시도가 회귀였다.
+#
+# 애플 칸 하나를 비우는 것이 곡 전체를 못 찾는 것보다 낫다. 게다가 429 자체는
+# /parse 캐시(routers/parse.py)가 줄여준다.
+
 
 def _to_track(track: dict, similarity: float | None = None) -> Track:
     artwork = track.get("artworkUrl100", "").replace("100x100bb", "600x600bb") or None
@@ -35,7 +46,11 @@ def _to_track(track: dict, similarity: float | None = None) -> Track:
 
 
 async def _get(url: str, params: dict) -> list[dict]:
-    """빈 값/None 파라미터는 빼고 GET. 실패하면 빈 리스트."""
+    """빈 값/None 파라미터는 빼고 GET. 실패하면 빈 리스트.
+
+    429 도 다른 오류와 똑같이 다룬다 — 기다리지 않고 곧바로 포기한다.
+    이유는 위 주석 참고.
+    """
     clean = {k: v for k, v in params.items() if v is not None and v != ""}
     try:
         async with httpx.AsyncClient(timeout=5) as client:

@@ -57,7 +57,7 @@ backend/
 ├── utils/
 │   └── platform_url.py       # 정규식 → (Platform, track_id) + 공유 ID 빌드/파싱
 │
-└── tests/                    # pytest 115개. 네트워크 없이 0.7초 (tests/README.md 참고)
+└── tests/                    # pytest 123개. 네트워크 없이 0.7초 (tests/README.md 참고)
     ├── scoring/              # 검증된 41곡 + iTunes 응답 660건 녹화
     ├── test_bugs.py          # 벅스 파싱 회귀 (+ bugs_fixtures/ 녹화 페이지)
     ├── test_share.py         # 공유 ID 왕복 + OG 페이지 이스케이프
@@ -299,6 +299,7 @@ for country in route_storefronts(title, artist):
 - **검색어 순서**: `아티스트 제목`입니다. `아이유 밤편지`는 정답을, `밤편지 아이유`는 엉뚱한 곡을 1위로 줍니다.
 - **상위 5개를 훑습니다**(`SCAN_LIMIT`). 정답이 1위가 아닌 경우가 실제로 있습니다.
 - **호출 비용**: 네이티브 스토어프론트에서 임계값을 넘으면 거기서 **조기 반환**하므로 보통 1회입니다. 다만 네이티브가 실패하면 US까지 2회가 되고, `_enrich_track`이 album/album_art를 보강할 때 1회가 더 붙습니다. 즉 `/parse` 당 **1~3회**입니다. 아래 레이트리밋(분당 약 20회)과 직결됩니다.
+- **429 는 기다리지 않습니다.** 다른 오류와 똑같이 빈 결과로 처리하고 애플 칸만 비웁니다. 한때 `Retry-After` 를 존중해 한 번 재시도했는데 **회귀였습니다** — 429 면 `_get` 이 빈 리스트를 주고, 그러면 `search()` 의 조기 반환이 성립하지 않아 스토어프론트를 전부 돕니다. 즉 429 일 때 호출과 대기가 최소가 아니라 **최대**가 됩니다. 한국어 곡이면 `search()` 한 번에 29초씩 두 번, `/parse` 는 `search()` 를 두 번 부르니 116초라 40초 데드라인에 걸려 504 가 났습니다. 재시도가 없을 때는 같은 상황에서 200 + `appleMusic: null` 이었습니다. 실패는 캐시되지 않으므로 그 504 를 사용자가 다시 누르면 멜론·벅스·FLO 를 또 긁습니다 — 업스트림을 보호하려던 코드가 스크래핑을 늘린 셈입니다. `tests/test_itunes_rate_limit.py` 가 이 결정을 고정합니다.
 - `search()`는 단일 best를 리스트로 감싸 반환합니다(호출부 인터페이스 통일).
 - 채택할 만한 후보가 없으면 **빈 리스트**를 반환합니다. 틀린 곡보다 빈 슬롯이 낫다는 원칙.
 
@@ -368,8 +369,32 @@ async with httpx.AsyncClient(headers=MELON_HEADERS, timeout=10) as client:
 ### 타임아웃 / 에러 정책
 
 - httpx 기본 5초. **Melon `lookup_by_id`만 10초**.
+- `/parse` 전체에는 기본 **40초** 데드라인이 있다. 넘으면 504를 반환하며,
+  진행 중이던 외부 호출은 취소된다.
 - 각 서비스는 외부 실패를 `try/except httpx.HTTPError`로 흡수 후 `None`/`[]` 반환 → 한 플랫폼이 죽어도 응답 전체는 살아남습니다.
 - 라우터에서 `HTTPException`으로 승격되는 것만: `400`(단축 URL 실패/미지원 플랫폼), `404`(곡 없음), `501`(lookup 미구현 — Spotify, Amazon).
+
+### `/parse` 보호 기본값
+
+한 번의 파싱은 여러 외부 API·스크래퍼를 호출하므로, API 서버보다 업스트림
+차단을 먼저 막아야 한다. 현재 단일 uvicorn 프로세스에서 다음 인메모리 방어를
+사용한다.
+
+| 환경 변수 | 기본값 | 역할 |
+|---|---:|---|
+| `PARSE_TIMEOUT_SECONDS` | `40` | 요청 전체 데드라인(초). 순차 단계에 쌓이는 각 서비스 timeout(멜론 10초, 나머지 5초)을 덮는 값 |
+| `PARSE_CACHE_TTL_SECONDS` | `600` | 성공한 동일 입력 응답 캐시 시간(초) |
+| `PARSE_CACHE_MAX_ENTRIES` | `500` | LRU 캐시 최대 항목 수 |
+| `PARSE_RATE_LIMIT` | `20` | 클라이언트별 윈도우당 최대 요청 수 |
+| `PARSE_RATE_WINDOW_SECONDS` | `60` | 제한 윈도우(초) |
+
+같은 입력이 동시에 들어오면 실제 외부 조회는 하나만 수행하고 나머지는 그 결과를
+공유한다. 실패·타임아웃 응답은 캐시하지 않는다. 제한 초과 시에는 `429`와
+`Retry-After` 헤더를 돌려준다.
+
+상태는 프로세스 메모리에만 있으므로 재시작하면 초기화된다. uvicorn 워커 또는
+서버를 여러 개로 늘릴 때에는 Redis 등 공유 저장소 기반 캐시·레이트리밋으로
+교체해야 한다.
 
 ---
 
@@ -390,7 +415,7 @@ uv run uvicorn main:app --reload      # http://localhost:8000
 ```bash
 cd backend
 uv sync --group dev
-uv run pytest -q          # 115개, 네트워크 없이 0.7초
+uv run pytest -q          # 123개, 네트워크 없이 0.8초
 ```
 
 무엇을 왜 지키는지는 [`tests/README.md`](backend/tests/README.md) 에 있습니다. 여기서는 두 가지만 짚습니다.
@@ -473,7 +498,7 @@ Oracle 문서: *"Oracle doesn't charge for Always Free resources after you upgra
 
 **~~벅스 링크 입력이 404입니다.~~** 고쳤습니다 — 7장의 `bugs.py` 항목과 `tests/test_bugs.py` 참고.
 
-**YouTube 쿼터가 실질적 상한입니다.** `search.list`는 호출당 100 유닛이고 기본 쿼터가 10,000/일입니다. `/parse` 한 번이 `search_mv_and_topic()` 으로 **1회만** 호출하므로 **하루 약 100회 파싱**이 한계입니다. (예전에는 MV용·Topic용으로 2회 호출해서 50회였습니다.) 더 늘리려면 캐싱이나 쿼터 증설이 필요합니다.
+**YouTube 쿼터가 실질적 상한입니다.** `search.list`는 호출당 100 유닛이고 기본 쿼터가 10,000/일입니다. `/parse` 한 번이 `search_mv_and_topic()` 으로 **1회만** 호출하므로 캐시 미스 기준 **하루 약 100회 파싱**이 한계입니다. (예전에는 MV용·Topic용으로 2회 호출해서 50회였습니다.) 동일 입력은 10분 캐시로 흡수하지만, 서로 다른 곡을 계속 조회하는 트래픽에는 여전히 쿼터 증설이 필요합니다.
 
 **멜론이 지원하지 않는 압축을 광고합니다.** `melon.py`가 `Accept-Encoding: gzip, deflate, br`을 보내지만 이 환경의 httpx는 brotli를 디코드할 수 없습니다(brotli 패키지 미설치). 현재는 멜론이 gzip으로 응답해 문제가 없지만, `br`로 응답하면 깨집니다.
 
@@ -481,7 +506,7 @@ Oracle 문서: *"Oracle doesn't charge for Always Free resources after you upgra
 
 **`/match`와 `merge_results`는 도달 불가 코드입니다.** 프론트에서 호출하지 않습니다.
 
-**레이트리밋 방어가 없습니다.** 자체 구현이 없고 스톡 Caddy에도 속도 제한 모듈이 없습니다. 남용 시 박스가 느려지거나 죽는 쪽으로 실패합니다(과금되지는 않습니다). `/parse` 폭주는 곧 멜론·벅스·FLO로의 폭주이므로, 박스 건강보다 **IP가 차단당하는 것**이 더 큰 위험입니다.
+**분산 레이트리밋은 아직 없습니다.** `/parse`에는 클라이언트별 인메모리 슬라이딩 윈도우 제한, 10분 TTL/LRU 캐시, 동일 입력의 동시 요청 합치기, 40초 전체 데드라인이 있다. 따라서 단일 프로세스 배포에서는 폭주를 줄인다. 다만 워커·서버를 여러 개로 확장하면 상태가 나뉘므로 Redis 같은 공유 저장소 기반 제한으로 바꿔야 한다. `/parse` 폭주는 곧 멜론·벅스·FLO로의 폭주이므로, 박스 건강보다 **IP가 차단당하는 것**이 더 큰 위험이다.
 
 ---
 
@@ -491,4 +516,4 @@ Oracle 문서: *"Oracle doesn't charge for Always Free resources after you upgra
 - 아티스트명 로마자 변환 비교(`지드래곤` ↔ `G-DRAGON`).
 - Deezer로 `isrc` 필드 채우기.
 - Spotify 연동 — URL 정규식은 이미 있고 `/parse`에서 501. ISRC를 주고받는 유일한 무료 경로지만, 2026년 2월 정책 변경으로 개발자 본인의 Premium 구독이 필요합니다.
-- iTunes 응답 캐싱 — 분당 20회 제한 대비.
+- 다중 워커/다중 서버 배포 시 Redis 기반 캐시·레이트리밋으로 전환.

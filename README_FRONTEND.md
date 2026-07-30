@@ -32,7 +32,7 @@ musiknot.github.io/
 │   ├── components/
 │   │   ├── Header.jsx          # 로고, 테마/언어 스위처, 메뉴
 │   │   ├── SearchBar.jsx       # URL 입력 + 클립보드 붙여넣기
-│   │   ├── InstallCard.jsx     # 홈 안내 카드 — 설치/iOS/데스크톱 3분기
+│   │   ├── InstallCard.jsx     # 홈 안내 카드 — Android PWA 설치/iOS 단축어/데스크톱 3분기
 │   │   ├── ShareWidget.jsx     # 결과 공유 (복사·시트·QR)
 │   │   ├── QrCode.jsx          # uqr → SVG 직접 렌더
 │   │   ├── PlatformGrid.jsx    # 글로벌/한국 두 그리드
@@ -93,7 +93,7 @@ URL 기반 자동 검색 두 가지를 지원합니다.
 | `public/manifest.webmanifest` | 매니페스트 + `share_target` |
 | `utils/installPrompt.js` | `beforeinstallprompt` 포착, OS 판정 |
 | `hooks/useInstall.js` | 카드가 쓸 상태 |
-| `components/InstallCard.jsx` | 홈 화면 안내 (3분기) |
+| `components/InstallCard.jsx` | 홈 화면 안내 — Android PWA 설치 / iOS 단축어 / 데스크톱 |
 | `utils/shareTarget.js` | 들어온 파라미터에서 링크 추출 |
 | `src/manifest.test.js` | 매니페스트가 설치 가능한 상태인지 고정 |
 
@@ -110,9 +110,13 @@ URL 기반 자동 검색 두 가지를 지원합니다.
 
 **앱별로 무엇이 오는지는 실측 중입니다.** 문서화될 성질의 정보가 아니라(각 앱의 구현 세부사항) 1차 출처가 없습니다. 그래서 공유 진입 시 원본 파라미터를 기기에 기록하고(`utils/shareLog.js`, 최근 20건) `?sharelog=1` 에서 확인합니다. 기록은 기기 밖으로 나가지 않습니다.
 
-**iOS 는 공유 시트에 들어갈 수 없습니다.** WebKit 의 Web Share Target 이슈(#194593)는 2019년에 열려 지금도 미배정 상태이고, Safari 27 에도 없습니다. 그래서 iOS 카드는 **"홈 화면에 추가" 까지만 약속합니다.** 공유 메뉴를 약속하면 거짓말이 됩니다 — `InstallCard.test.jsx` 가 그 문구가 iOS 분기에 새어 들어오지 않는지 검사합니다. (참고로 `navigator.share` 는 iOS 에서 동작합니다. 내보내는 Web Share API 와 받는 Web Share **Target** 은 다른 API 입니다.)
+**iOS 는 PWA를 공유 시트에 넣을 수 없습니다.** WebKit은 Web Share Target을 지원하지 않으므로, iOS 카드는 PWA 설치 대신 **Apple 단축어 `Musiknot로 공유`**를 설치하게 합니다. 이 단축어는 음악 앱에서 받은 입력을 URL 인코딩해 `?text=` 쿼리로 감싼 Musiknot 링크를 만들고, 링크 타입으로 변환한 뒤 iOS 공유 시트를 엽니다. 단축어는 [iCloud 공유 링크](https://www.icloud.com/shortcuts/0d61d3b3e72e48248d78c095c6c26ab8)로 배포합니다.
+
+`?text=`를 쓰는 이유는 음악 앱이 URL만 주는지, 제목과 URL을 섞어 주는지가 일정하지 않기 때문입니다. `extractSharedUrl`은 텍스트 안의 URL을 전부 훑어 지원 플랫폼을 우선 선택합니다. URL 전체를 인코딩하지 않으면 원본 링크의 `&`가 바깥 쿼리의 구분자로 해석되므로, 단축어에서 반드시 **URL 인코딩 결과**를 넣어야 합니다.
 
 > ⚠️ 안드로이드에서 공유 시트 등록은 **WebAPK 설치**에 달려 있습니다. 설치가 WebAPK 가 아니라 단순 바로가기로 떨어지면 홈 화면 아이콘은 생겨도 공유 메뉴에는 나타나지 않습니다.
+
+Android에서 `beforeinstallprompt`가 오면 카드의 **홈 화면에 설치** 버튼으로 브라우저 프롬프트를 연다. 이 신호가 없는 Android에서도 데스크톱용 일반 안내로 떨어뜨리지 않고, Chrome 메뉴(⋮)의 **앱 설치** 또는 **홈 화면에 추가** 경로를 알려 주는 PWA 설치 카드를 표시한다. 프롬프트가 없을 때 가짜 설치 버튼을 만들면 눌러도 아무 반응이 없으므로 만들지 않는다.
 
 ### 공유 위젯 (`components/ShareWidget.jsx`)
 
@@ -259,7 +263,7 @@ npm test    # 52개, 네트워크 없이 실행
 | `hooks/useParse.test.jsx` | `parse`·`reset`·`parseById` 의 **참조가 유지**되는가 (무한 루프의 근본 원인) |
 | `App.test.jsx` | `?id=` / `?url=` 진입 시 요청이 **정확히 1회**인가 (StrictMode 이중 실행 포함) |
 | `components/ShareWidget.test.jsx` | `navigator.share` 가 없을 때 버튼을 **렌더하지 않는가**, 클립보드 실패 폴백, QR 열기/닫기 |
-| `components/InstallCard.test.jsx` | 분기마다 **약속하는 내용이 다르다** — iOS 에 공유 메뉴를 약속하지 않는가, 이미 설치했는데 또 설치하라고 하지 않는가 |
+| `components/InstallCard.test.jsx` | 분기마다 **약속하는 내용이 다르다** — iOS 에 검증된 단축어 설치 링크를 주는가, 이미 설치했는데 또 설치하라고 하지 않는가 |
 | `utils/shareTarget.test.js` | 링크가 `url`·`text`·`title` 중 어디로 와도 찾아내는가, 여러 개 중 지원 도메인을 고르는가 |
 | `manifest.test.js` | 매니페스트가 **설치 가능한 상태로** 남아 있는가 (깨지면 공유 시트에서 조용히 사라진다) |
 

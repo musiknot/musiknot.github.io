@@ -8,15 +8,16 @@
  * 여기서 지키는 것은 렌더링이 아니라 **문구가 하는 약속**이다. 분기마다
  * 약속하는 게 다르고, 틀린 분기가 뜨면 없는 기능을 광고하게 된다:
  *
- *   설치 가능 → "공유 메뉴에 뜬다"    (설치해야 실제로 그렇게 된다)
- *   iOS      → "홈 화면에 추가"       (iOS 는 Web Share Target 을 지원하지
- *                                      않으므로 공유 메뉴는 약속하면 안 된다)
+ *   Android    → 설치 버튼 또는 수동 설치 경로 (설치 신호가 없어도 안내한다)
+ *   iOS      → 단축어 설치              (iOS 는 Web Share Target 을 지원하지
+ *                                      않으므로 Apple 단축어로 공유 메뉴를 연다)
  *   설치됨    → "공유 메뉴를 써 보세요" (설치하라고 또 말하면 안 된다)
  */
 import { render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { translations } from '../constants/translations'
+import { IOS_SHORTCUT_URL } from '../constants/shortcuts'
 
 const t = (key) => translations.ko[key] ?? key
 
@@ -68,15 +69,17 @@ describe('InstallCard', () => {
         expect(screen.getByText(t('installedNote'))).toBeInTheDocument()
     })
 
-    it('iOS 에는 공유 메뉴를 약속하지 않는다', async () => {
-        // iOS 는 Web Share Target 을 지원하지 않는다. 홈 화면에 추가해도
-        // 음악 앱의 공유 메뉴에는 Musiknot 이 나타나지 않는다.
+    it('iOS 에는 단축어 설치 링크를 준다', async () => {
+        // iOS 는 Web Share Target 을 지원하지 않는다. PWA 설치를 권하는 대신
+        // 음악 앱의 공유 시트에서 실행할 iCloud 단축어를 제공한다.
         const Card = await mockInstall({ os: 'ios' })
         render(<Card t={t} />)
 
-        expect(screen.getByText(t('iosTitle'))).toBeInTheDocument()
+        expect(screen.getByText(t('iosShortcutTitle'))).toBeInTheDocument()
+        expect(screen.getByRole('link', { name: t('iosShortcutAction') }))
+            .toHaveAttribute('href', IOS_SHORTCUT_URL)
         expect(screen.queryByText(t('installTitle'))).not.toBeInTheDocument()
-        expect(screen.queryByRole('button')).not.toBeInTheDocument()
+        expect(screen.queryByText('홈 화면에 추가')).not.toBeInTheDocument()
     })
 
     it('데스크톱에서는 기존 안내를 그대로 둔다', async () => {
@@ -87,12 +90,15 @@ describe('InstallCard', () => {
         expect(screen.queryByRole('button')).not.toBeInTheDocument()
     })
 
-    it('설치 불가한 안드로이드에 설치 버튼을 띄우지 않는다', async () => {
-        // UA 가 안드로이드라고 무조건 설치할 수 있는 게 아니다. 눌러도 아무
-        // 일이 없는 버튼을 보여주느니 없는 게 낫다.
+    it('설치 신호가 없는 안드로이드에도 수동 PWA 설치 경로를 안내한다', async () => {
+        // beforeinstallprompt가 없어도 Chrome 메뉴에서는 설치가 가능할 수 있다.
+        // 일반 모바일 안내로 떨어뜨리면 사용자가 그 경로를 알 수 없다.
         const Card = await mockInstall({ os: 'android', canInstall: false })
         render(<Card t={t} />)
 
+        expect(screen.getByText(t('androidInstallTitle'))).toBeInTheDocument()
+        expect(screen.getByText(t('androidInstallBody'))).toBeInTheDocument()
+        expect(screen.queryByText(t('mobileNotice'))).not.toBeInTheDocument()
         expect(screen.queryByRole('button')).not.toBeInTheDocument()
     })
 })

@@ -1,8 +1,10 @@
 import asyncio
 import logging
+import os
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 
+from core.resilience import AsyncTTLCache, SlidingWindowRateLimiter
 from core.scoring import SEARCH_MATCH_THRESHOLD
 from models.schemas import (
     ParseRequest,
@@ -16,6 +18,29 @@ from utils.platform_url import build_share_id, extract_platform_id, parse_share_
 
 log    = logging.getLogger(__name__)
 router = APIRouter()
+
+
+# 전부 환경 변수로 바꿀 수 있게 두되, 기본값은 한 대의 개인 서비스에서 업스트림
+# 차단을 피하는 보수적인 수준이다. 인메모리 상태이므로 프로세스 재시작 때 초기화된다.
+#
+# 데드라인 40초는 각 서비스의 timeout(멜론 10초, 나머지 5초)이 순차 단계
+# (단축 URL 해제 → lookup → 메타 보강 → 크로스플랫폼 병렬 조회)에 쌓이는 것을
+# 덮는 값이다. 외부 호출은 어느 것도 재시도하지 않으므로 이 예산이 곱해지지 않는다
+# (services/itunes.py 의 429 주석 참고).
+PARSE_TIMEOUT_SECONDS = float(os.getenv("PARSE_TIMEOUT_SECONDS", "40"))
+PARSE_CACHE_TTL_SECONDS = float(os.getenv("PARSE_CACHE_TTL_SECONDS", "600"))
+PARSE_CACHE_MAX_ENTRIES = int(os.getenv("PARSE_CACHE_MAX_ENTRIES", "500"))
+PARSE_RATE_LIMIT = int(os.getenv("PARSE_RATE_LIMIT", "20"))
+PARSE_RATE_WINDOW_SECONDS = float(os.getenv("PARSE_RATE_WINDOW_SECONDS", "60"))
+
+_parse_cache = AsyncTTLCache(
+    ttl_seconds=PARSE_CACHE_TTL_SECONDS,
+    max_entries=PARSE_CACHE_MAX_ENTRIES,
+)
+_parse_limiter = SlidingWindowRateLimiter(
+    limit=PARSE_RATE_LIMIT,
+    window_seconds=PARSE_RATE_WINDOW_SECONDS,
+)
 
 
 # 플랫폼 → 게이트웨이 lookup_by_id 라우팅
@@ -115,8 +140,12 @@ async def _find_cross_platform_ids(
     return PlatformIds(**ids)
 
 
-@router.post("/parse", response_model=ParseResponse)
-async def parse_url(req: ParseRequest):
+async def _parse_uncached(req: ParseRequest) -> ParseResponse:
+    """외부 서비스 조회를 실제로 수행하는 `/parse` 본문.
+
+    캐시·제한·시간 제한과 분리해 두면, 실패한 조회가 캐시되는 일이 없고 이
+    함수의 플랫폼 처리 흐름도 그대로 읽힌다.
+    """
     # 공유 ID 로 들어온 경우 — URL 해제·정규식 단계를 건너뛴다.
     # ID 자체가 이미 (platform, track_id) 이기 때문이다.
     if req.id:
@@ -169,3 +198,46 @@ async def parse_url(req: ParseRequest):
         platforms = platform_ids,
         shareId   = build_share_id(platform, track_id),
     )
+
+
+def _cache_key(req: ParseRequest) -> str:
+    """URL과 공유 ID 입력 공간을 명확히 분리한 캐시 키."""
+    return f"id:{req.id}" if req.id else f"url:{req.url}"
+
+
+def _client_key(request: Request) -> str:
+    """Caddy(로컬 역방향 프록시)를 거친 실제 요청자의 안정적인 키.
+
+    `X-Forwarded-For`는 바로 연결한 쪽이 loopback일 때만 신뢰한다. 외부에서
+    API 포트에 직접 붙는 요청은 이 헤더를 위조해 제한을 우회할 수 없고, 로컬
+    개발 서버에서는 자연스럽게 `request.client.host`를 사용한다.
+    """
+    host = request.client.host if request.client else "unknown"
+    if host in {"127.0.0.1", "::1"}:
+        forwarded = request.headers.get("x-forwarded-for", "").split(",", 1)[0].strip()
+        if forwarded:
+            return forwarded
+    return host
+
+
+@router.post("/parse", response_model=ParseResponse)
+async def parse_url(req: ParseRequest, request: Request):
+    allowed, retry_after = await _parse_limiter.allow(_client_key(request))
+    if not allowed:
+        raise HTTPException(
+            status_code=429,
+            detail="요청이 너무 많습니다. 잠시 후 다시 시도해 주세요.",
+            headers={"Retry-After": str(retry_after)},
+        )
+
+    async def fetch() -> ParseResponse:
+        try:
+            return await asyncio.wait_for(_parse_uncached(req), timeout=PARSE_TIMEOUT_SECONDS)
+        except TimeoutError as e:
+            log.warning("Parse request timed out after %.1fs", PARSE_TIMEOUT_SECONDS)
+            raise HTTPException(
+                status_code=504,
+                detail="음원 서비스 응답이 지연되고 있습니다. 잠시 후 다시 시도해 주세요.",
+            ) from e
+
+    return await _parse_cache.get_or_create(_cache_key(req), fetch)
